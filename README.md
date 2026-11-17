@@ -1,0 +1,41 @@
+# app-itonami-egov
+
+電子政府の Itonami bot profile（AWAI-155 / AWAI-3147）。国民側と政府側を、同じ制度パックでつなぐ。
+
+| profile | 立場 | すること | しないこと |
+|---|---|---|---|
+| `shakai` | 国民側（個人・家族） | 出典・期限・不明点つきの候補手続き、下書き、本人が同意した項目だけの受け渡し票 | 届出の要否や受理の判断、提出・送信 |
+| `kaisha` | 国民側（法人・団体） | 代表権を確認したうえでの候補手続きと下書き | 登記の受否の判断、署名・提出 |
+| `matsuri` | 政府側（担当者の補助） | 機関・担当者・受領者を確認し、受付準備の確認表を作って人の審査者へ引き継ぐ | 受理・審査・決定・通知の送付 |
+
+3 つの profile は判定ロジック（`src/itonami/egov/core.cljc`）と制度パック（`seido/*.edn`）を共有する。
+各国への対応は、国ごとに profile を複製せず、制度パックを足して行う。
+
+## 制度パック
+
+| パック | 中身 | 状態 |
+|---|---|---|
+| `seido/jp.edn` | 住民基本台帳法 第22〜24条（転入・転居・転出届）、会社法 第915条（変更の登記） | 出典は e-Gov 法令 API v2 で 2026-11-18 に取得し sha256 を記録。専門家レビュー前。市町村は架空の 2 つだけ |
+| `seido/us.edn` | 骨組みだけ | 州を指定しなければ未確定。州の手続きは未収録 |
+
+パックの `:pack/review-by` を過ぎると止まる。`:review/status` が `:reviewed` になるまで、候補は示すが提出は提案しない。
+
+## 止まり方
+
+結果は `:candidates`（候補）、`:packet`（受け渡し票）、`:ready-for-human-review`（受付準備）のほかに、
+`:blocked`（権限なし、同意拒否、古いパック、代表権未確認など）か `:undetermined`（未対応の法域、州・市町村の未指定、曖昧な住所など）を返す。
+`matsuri-intake` の `:decision` は常に `nil`。
+
+## 実行
+
+```bash
+bb test            # test（clojure -M でも同じ test が通る）
+bb check-profiles  # profile 定義の検査
+bb fixture-run     # 架空データの通し。記録は docs/evidence/
+```
+
+## 現状（2026-11-18）
+
+- 定義・判定ロジック・test・架空データの通しの記録まで。itonami agent での実行（native turn）は未確認。
+- 画面（Tauri app への取り込み）は AWAI-3148、制度パックのデータ元は AWAI-3150。
+- profile は registry に登録するが、登録は権限を与えず、cron も有効にしない。

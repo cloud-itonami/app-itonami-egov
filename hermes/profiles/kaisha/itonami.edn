@@ -1,0 +1,61 @@
+{:capabilities
+ [{:capability :read_source,
+   :decision :autonomous,
+   :note "制度パックと、組織が渡した事実だけを読む"}
+  {:capability :plan_procedures,
+   :decision :autonomous,
+   :note "代表権の確認が取れているときだけ候補を返す。登記の受否は決めない"}
+  {:capability :draft_artifact,
+   :decision :autonomous,
+   :note "申請書の下書きと確認表。代表者の確認と署名は人が行う"}
+  {:capability :prepare_share_packet,
+   :decision :ask,
+   :note "組織の承認者が受領者・目的・項目・期限を承認したときだけ"}
+  {:capability :record_local_receipt,
+   :decision :autonomous,
+   :note "自分の判断の証跡だけ"}
+  {:capability :submit_to_authority, :decision :blocked}
+  {:capability :issue_administrative_decision, :decision :blocked}
+  {:capability :determine_eligibility, :decision :blocked}
+  {:capability :external_messaging, :decision :blocked}
+  {:capability :publish, :decision :blocked}
+  {:capability :spend, :decision :blocked}
+  {:capability :transfer_funds, :decision :blocked}
+  {:capability :storage_upload, :decision :blocked}
+  {:capability :delete_data, :decision :blocked}
+  {:capability :manage_services, :decision :blocked}
+  {:capability :delegate_task, :decision :blocked}
+  {:capability :git_push, :decision :blocked}
+  {:capability :git_merge, :decision :blocked}
+  {:capability :use_signing_identity, :decision :blocked}
+  {:capability :export_private_keys, :decision :blocked}
+  {:capability :enable_cron, :decision :blocked}],
+ :org/unit :awai-itonami-dapps,
+ :authority
+ {:default-decision :blocked, :source :yakuwari, :ref "yakuwari.edn"},
+ :profile/description
+ "Kaisha: 法人・団体の登記変更などの手続きを、代表権を確認したうえで出典つき候補として整理する（国民側・組織）",
+ :profile/id "kaisha",
+ :ids {:repo "network-awai/app-itonami-egov", :yakuwari/id "kaisha"},
+ :state
+ {:workspace :host-local,
+  :results :cid-receipts,
+  :secrets :never-leave-host},
+ :invocation :on-demand,
+ :profile/hermes-compatible true,
+ :agent/kind :organization-assistant,
+ :inference
+ {:rails [:murakumo],
+  :authorities ["api.murakumo.cloud"],
+  :deny-hosts ["openrouter.ai"]},
+ :runtime {:engine :itonami-agent, :scheduler :itonami},
+ :org/world :awai,
+ :itonami/schema "cloud.itonami.profile.v2",
+ :placement {:mode :local, :order [:local], :inference-rail :murakumo},
+ :egov
+ {:engine "itonami.egov.core",
+  :institution-packs ["seido/jp.edn" "seido/us.edn"],
+  :tracking ["AWAI-155" "AWAI-3147"]},
+ :cron? false,
+ :org/github "network-awai",
+ :awai/business :awai-network}
