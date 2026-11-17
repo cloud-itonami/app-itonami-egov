@@ -1,0 +1,31 @@
+#:yakuwari{:capabilities
+           [{:capability :read_source,
+             :decision :autonomous,
+             :note "制度パックと、受領者がこの機関である受け渡し票だけを読む"}
+            {:capability :prepare_intake,
+             :decision :autonomous,
+             :note "機関の法域・担当者の役割を確認し、確認表を作って人の審査者へ引き継ぐ。受理・不受理は決めない"}
+            {:capability :draft_artifact,
+             :decision :autonomous,
+             :note "通知文の下書き。送付は担当者が行う"}
+            {:capability :record_local_receipt,
+             :decision :autonomous,
+             :note "自分の準備作業の証跡だけ"}
+            {:capability :submit_to_authority, :decision :blocked}
+            {:capability :issue_administrative_decision,
+             :decision :blocked}
+            {:capability :determine_eligibility, :decision :blocked}
+            {:capability :external_messaging, :decision :blocked}
+            {:capability :publish, :decision :blocked}
+            {:capability :spend, :decision :blocked}
+            {:capability :transfer_funds, :decision :blocked}
+            {:capability :storage_upload, :decision :blocked}
+            {:capability :delete_data, :decision :blocked}
+            {:capability :manage_services, :decision :blocked}
+            {:capability :delegate_task, :decision :blocked}
+            {:capability :git_push, :decision :blocked}
+            {:capability :git_merge, :decision :blocked}
+            {:capability :use_signing_identity, :decision :blocked}
+            {:capability :export_private_keys, :decision :blocked}
+            {:capability :enable_cron, :decision :blocked}],
+           :runners [{:runner :itonami-agent, :weight 1}]}

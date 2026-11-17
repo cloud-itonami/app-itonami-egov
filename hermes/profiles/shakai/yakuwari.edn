@@ -1,0 +1,35 @@
+#:yakuwari{:capabilities
+           [{:capability :read_source,
+             :decision :autonomous,
+             :note "制度パック（seido/*.edn）と、本人が渡した事実だけを読む"}
+            {:capability :plan_procedures,
+             :decision :autonomous,
+             :note "候補・期限・出典・不明点を返す。届出の要否や受理は決めない"}
+            {:capability :draft_artifact,
+             :decision :autonomous,
+             :note "届出書の下書きと確認表。本人が確認するまで提出物にならない"}
+            {:capability :prepare_share_packet,
+             :decision :ask,
+             :note
+             "本人が受領者・目的・項目・期限を指定して承認したときだけ、同意した項目で受け渡し票を作る。送信はしない"}
+            {:capability :record_local_receipt,
+             :decision :autonomous,
+             :note "自分の判断の証跡だけを host-local に残す"}
+            {:capability :submit_to_authority, :decision :blocked}
+            {:capability :issue_administrative_decision,
+             :decision :blocked}
+            {:capability :determine_eligibility, :decision :blocked}
+            {:capability :external_messaging, :decision :blocked}
+            {:capability :publish, :decision :blocked}
+            {:capability :spend, :decision :blocked}
+            {:capability :transfer_funds, :decision :blocked}
+            {:capability :storage_upload, :decision :blocked}
+            {:capability :delete_data, :decision :blocked}
+            {:capability :manage_services, :decision :blocked}
+            {:capability :delegate_task, :decision :blocked}
+            {:capability :git_push, :decision :blocked}
+            {:capability :git_merge, :decision :blocked}
+            {:capability :use_signing_identity, :decision :blocked}
+            {:capability :export_private_keys, :decision :blocked}
+            {:capability :enable_cron, :decision :blocked}],
+           :runners [{:runner :itonami-agent, :weight 1}]}

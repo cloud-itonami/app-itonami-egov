@@ -1,0 +1,108 @@
+;; 架空データによる通しの記録（AWAI-3147）。実在の人・自治体・提出は含まない。
+;; 生成: bb fixture-run
+{:run/today "2026-11-18",
+ :run/fixtures
+ {:facts
+  {:person "fixture-person-1",
+   :event :move,
+   :from {:country :jp, :subdivision :jp.fixture/city-a},
+   :to {:country :jp, :subdivision :jp.fixture/city-b},
+   :moved-on "2026-11-20",
+   :address-confirmed? true},
+  :consent
+  {:decision :approved,
+   :recipient :jp.fixture/city-b-office,
+   :purpose :address-change-intake,
+   :items #{:moved-on :procedures :from :principal-ref :to},
+   :expires "2026-12-31"},
+  :agency
+  {:id :jp.fixture/city-b-office,
+   :name "架空市B 市民課（テスト用）",
+   :jurisdiction {:country :jp, :subdivision :jp.fixture/city-b},
+   :confirmed? true},
+  :staff
+  {:id "fixture-staff-1",
+   :agency :jp.fixture/city-b-office,
+   :roles #{:intake}}},
+ :step/shakai-plan
+ {:status :candidates,
+  :principal "fixture-person-1",
+  :applies-when :move-between-municipalities,
+  :candidates
+  [{:procedure/id :jp/tenshutsu-todoke,
+    :procedure/title "転出届",
+    :standing :candidate,
+    :deadline {:kind :before, :due-before "2026-11-20"},
+    :submit-to :jp.fixture/city-a,
+    :sources
+    [{:title "住民基本台帳法 第24条（転出届）",
+      :issuer "e-Gov 法令検索（デジタル庁）",
+      :url "https://laws.e-gov.go.jp/law/342AC0000000081",
+      :law-revision-id "342AC0000000081_20261024_508AC0000000066",
+      :in-force-from "2026-10-24",
+      :retrieved-on "2026-11-18",
+      :sha256
+      "0b2692450e352983aa517f667e46c6935e206468b3cec92c735ef306121570da",
+      :id :jp.law/jumin-24}],
+    :unknowns []}
+   {:procedure/id :jp/tennyu-todoke,
+    :procedure/title "転入届",
+    :standing :candidate,
+    :deadline
+    {:kind :within-days,
+     :days 14,
+     :from "2026-11-20",
+     :due "2026-12-04"},
+    :submit-to :jp.fixture/city-b,
+    :sources
+    [{:title "住民基本台帳法 第22条（転入届）",
+      :issuer "e-Gov 法令検索（デジタル庁）",
+      :url "https://laws.e-gov.go.jp/law/342AC0000000081",
+      :law-revision-id "342AC0000000081_20261024_508AC0000000066",
+      :in-force-from "2026-10-24",
+      :retrieved-on "2026-11-18",
+      :sha256
+      "4fcd8ce5cb628859634e33ac4c64fe14c2a9f768caf7a72d4395ed83d21ccd2b",
+      :id :jp.law/jumin-22}],
+    :unknowns []}],
+  :pack
+  {:id :jp/residence-and-corporate-address,
+   :version "2026.11.18-1",
+   :review :unreviewed,
+   :review-by "2027-02-18"},
+  :submission-proposal :withheld-unreviewed-pack,
+  :note "候補の一覧であり、届出の要否や受理を決めるのは市町村長。"},
+ :step/share-packet
+ {:status :packet,
+  :packet/recipient :jp.fixture/city-b-office,
+  :packet/purpose :address-change-intake,
+  :packet/expires "2026-12-31",
+  :packet/pack
+  {:id :jp/residence-and-corporate-address,
+   :version "2026.11.18-1",
+   :review :unreviewed,
+   :review-by "2027-02-18"},
+  :packet/items
+  {:moved-on "2026-11-20",
+   :procedures [:jp/tenshutsu-todoke :jp/tennyu-todoke],
+   :from {:country :jp, :subdivision :jp.fixture/city-a},
+   :principal-ref "fixture-person-1",
+   :to {:country :jp, :subdivision :jp.fixture/city-b}}},
+ :step/matsuri-intake
+ {:handoff {:to :human-reviewer, :role :case-reviewer},
+  :prepared-by "fixture-staff-1",
+  :agency :jp.fixture/city-b-office,
+  :note "受付準備まで。受理・不受理・審査・通知の決定は担当者が行う。",
+  :status :ready-for-human-review,
+  :procedures [:jp/tennyu-todoke],
+  :checklist
+  ["届出事項（住民基本台帳法 第22条第1項各号）が揃っているかを担当者が確認する"
+   "住所の異動に関する文書（同条第2項）の添付を担当者が確認する"
+   "転入日から14日以内かを担当者が確認し、過ぎていれば扱いを担当者が判断する"],
+  :pack
+  {:id :jp/residence-and-corporate-address,
+   :version "2026.11.18-1",
+   :review :unreviewed,
+   :review-by "2027-02-18"},
+  :decision nil},
+ :step/after-submission {:without-receipt :submitted-unconfirmed}}
