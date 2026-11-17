@@ -1,0 +1,8 @@
+;; guest（Gyosei 画面）のビルド。依存は deps.edn の :guest alias。
+;; clojure -M:guest -m shadow.cljs.devtools.cli release guest
+{:deps {:aliases [:guest]}
+ :builds {:guest {:target :browser
+                  :output-dir "target/guest"
+                  :asset-path "."
+                  :modules {:main {:init-fn itonami.egov.guest/init}}
+                  :compiler-options {:optimizations :advanced}}}}

@@ -6,5 +6,8 @@
                 (System/exit (if (zero? (+ fail error)) 0 1)))}
   fixture-run {:doc "架空データで住所変更の通しを実行し、記録を標準出力に書く"
                :task (do (require 'fixture-run) ((resolve 'fixture-run/-main)))}
+  guest {:doc "guest 画面をビルドし dist/gyosei.html に埋め込む（JVM で shadow-cljs を使う）"
+         :task (do (shell "clojure -M:guest -m shadow.cljs.devtools.cli release guest")
+                   (require 'bundle-guest) ((resolve 'bundle-guest/-main)))}
   check-profiles {:doc "profile の itonami.edn と yakuwari.edn の capability が一致するか確かめる"
                   :task (do (require 'check-profiles) ((resolve 'check-profiles/-main)))}}}
