@@ -26,12 +26,21 @@
 `:blocked`（権限なし、同意拒否、古いパック、代表権未確認など）か `:undetermined`（未対応の法域、州・市町村の未指定、曖昧な住所など）を返す。
 `matsuri-intake` の `:decision` は常に `nil`。
 
+## 画面（Gyosei、AWAI-3148）
+
+`guest/` は Awai OS の shell が sandbox iframe（kotoba-client-runtime の `mountRestrictedClientApp`）で動かす画面。
+`bb guest` で `dist/gyosei.html`（単一の HTML）と `dist/gyosei.json`（bytes と sha256）を作る。
+画面は通信できない（CSP `connect-src 'none'`）。外部操作は e-Gov 法令 API の条文読み取り（`awai-egov` / `e-gov-law-api` / `read-statute`）だけで、
+host に selector と法令 ID・条番号を渡す。エンドポイントの組み立てと毎回の同意は host 側の共通 broker が行う。
+取得した条文の sha256 を制度パックの記録と比べ、一致か更新ありを表示する。Matsuri への受け渡しは、この端末内のテスト用で送信はしない。
+
 ## 実行
 
 ```bash
 bb test            # test（clojure -M でも同じ test が通る）
 bb check-profiles  # profile 定義の検査
 bb fixture-run     # 架空データの通し。記録は docs/evidence/
+bb guest           # 画面のビルド（JVM で shadow-cljs）
 ```
 
 ## 現状（2026-11-18）
