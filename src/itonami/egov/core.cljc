@@ -127,11 +127,13 @@
       {:kind :unknown})))
 
 (defn- submit-to [where facts]
-  (case where
-    :from-municipality (get-in facts [:from :subdivision])
-    :to-municipality (get-in facts [:to :subdivision])
-    :registry-office {:registry-office-for (get-in facts [:to :subdivision])}
-    nil))
+  (if (map? where)
+    where ; 国の機関など、場所によらない提出先（例: {:agency :se/skatteverket :name "Skatteverket"}）
+    (case where
+      :from-municipality (get-in facts [:from :subdivision])
+      :to-municipality (get-in facts [:to :subdivision])
+      :registry-office {:registry-office-for (get-in facts [:to :subdivision])}
+      nil)))
 
 (defn- candidate [pack facts proc]
   {:procedure/id (:procedure/id proc)
@@ -163,6 +165,16 @@
                 (not (after? today (:expires grant)))))))
 
 ;; ---------------------------------------------------------------------------
+;; 手続きの適用条件
+
+(defn applies?
+  "手続きの :applies-when（1 つのキーワードか、その集合）が場面 situation に当たるか。"
+  [applies-when situation]
+  (if (set? applies-when)
+    (contains? applies-when situation)
+    (= applies-when situation)))
+
+;; ---------------------------------------------------------------------------
 ;; Shakai（国民側：個人・家族）
 
 (defn shakai-plan
@@ -189,8 +201,9 @@
                 when* (if (= (:subdivision from) (:subdivision to))
                         :move-within-municipality
                         :move-between-municipalities)
-                procs (filter #(and (= :person (:subject %)) (= when* (:applies-when %)))
-                              (:pack/procedures pack))]
+                procs (filter #(and (= :person (:subject %)) (applies? (:applies-when %) when*))
+                              (:pack/procedures pack))
+                refs (get-in pack [:pack/subdivisions (:subdivision to) :references])]
             (if (empty? procs)
               (undetermined :no-procedure-in-pack :applies-when when*)
               {:status :candidates
@@ -200,7 +213,9 @@
                :pack {:id (:pack/id pack) :version (:pack/version pack)
                       :review (:review/status pack) :review-by (:pack/review-by pack)}
                :submission-proposal (review-gate pack)
-               :note "候補の一覧であり、届出の要否や受理を決めるのは市町村長。"})))))))
+               ;; 転入先の市町村の条例・方針。手続きではなく、所在を示す参考情報。
+               :local-references (vec refs)
+               :note "候補の一覧であり、届出の要否や受理を決めるのは当局。"})))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Kaisha（国民側：法人・団体）
@@ -221,7 +236,7 @@
         (if (stopped? ctx)
           ctx
           (let [pack (:pack ctx)
-                procs (filter #(and (= form (:subject %)) (= :head-office-move (:applies-when %)))
+                procs (filter #(and (= form (:subject %)) (applies? (:applies-when %) :head-office-move))
                               (:pack/procedures pack))]
             (if (empty? procs)
               (undetermined :unsupported-entity-form :form form)

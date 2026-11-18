@@ -71,7 +71,8 @@
    :review :unreviewed,
    :review-by "2027-02-18"},
   :submission-proposal :withheld-unreviewed-pack,
-  :note "候補の一覧であり、届出の要否や受理を決めるのは市町村長。"},
+  :local-references [],
+  :note "候補の一覧であり、届出の要否や受理を決めるのは当局。"},
  :step/share-packet
  {:status :packet,
   :packet/recipient :jp.fixture/city-b-office,

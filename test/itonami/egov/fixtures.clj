@@ -4,7 +4,8 @@
 
 (def packs
   [(edn/read-string (slurp "seido/jp.edn"))
-   (edn/read-string (slurp "seido/us.edn"))])
+   (edn/read-string (slurp "seido/us.edn"))
+   (edn/read-string (slurp "seido/se.edn"))])
 
 (def today "2026-11-18")
 
@@ -46,5 +47,13 @@
    :moved-on "2026-11-20"
    :address-confirmed? true
    :representative-confirmed? true})
+
+(def se-move-facts
+  {:person person
+   :event :move
+   :from {:country :se :subdivision :se.fixture/kommun-a}
+   :to {:country :se :subdivision :se.kommun/goteborg}
+   :moved-on "2026-11-20"
+   :address-confirmed? true})
 
 (def org-grant {:actor :delegate :principal org :scope #{:plan} :expires "2026-12-31"})

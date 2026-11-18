@@ -10,6 +10,7 @@
 
 (def packs (bundled-packs))
 (def jp (c/find-pack packs :jp))
+(defn- pack-of [country] (c/find-pack packs country))
 
 ;; ---------------------------------------------------------------------------
 ;; 文言（安定したキー。文を断片から組み立てない）
@@ -19,7 +20,7 @@
 (def copy
   {:ja {:title "Gyosei" :tab/shakai "国民 · Shakai" :tab/kaisha "組織 · Kaisha" :tab/matsuri "政府 · Matsuri"
         :from "転出元" :to "転入先" :moved-on "異動日" :confirmed "住所が確定している" :plan "候補を出す"
-        :country/jp "日本" :country/us "米国（州は未指定）" :other "パックにない市町村"
+        :country/jp "日本" :country/us "米国（州は未指定）" :country/se "スウェーデン" :other "パックにない市町村"
         :intro "住所変更の事実を入れると、必要になりそうな手続きを出典つきで出します。"
         :candidate "候補" :due "期限" :submit-to "提出先" :source "出典" :verify "出典を確認"
         :verifying "確認中…" :verified "取得時と一致" :changed "出典が更新されています。制度パックの見直しが必要です"
@@ -36,10 +37,13 @@
         :agency "機関" :role "担当者の役割" :role/intake "受付" :role/viewer "閲覧のみ" :prepare "受付準備をする"
         :no-packet "受け渡し票がまだありません。Shakai タブで作ってください。"
         :ready "受付準備まで。受理・不受理・審査の決定は担当者が行います。" :decision-none "決定: なし" :handoff "引継ぎ先: 審査担当"
-        :blocked "止めました" :undetermined "結論を出していません" :host-unavailable "host に接続していません"}
+        :blocked "止めました" :undetermined "結論を出していません" :host-unavailable "host に接続していません"
+        :local-refs "転入先の条例・方針（参考。手続きではありません）" :ref-line "{title}（{issuer}, {date} 取得）"
+        :no-verify "この出典は画面から照合できません（取得時の sha256 は記録済み）"
+        :packet-jp-only "受け渡し票と Matsuri のテストは日本の架空データだけです"}
    :en {:title "Gyosei" :tab/shakai "People · Shakai" :tab/kaisha "Organizations · Kaisha" :tab/matsuri "Government · Matsuri"
         :from "Moving from" :to "Moving to" :moved-on "Move date" :confirmed "The address is confirmed" :plan "Show candidates"
-        :country/jp "Japan" :country/us "United States (no state)" :other "Municipality not in the pack"
+        :country/jp "Japan" :country/us "United States (no state)" :country/se "Sweden" :other "Municipality not in the pack"
         :intro "Enter the facts of an address change to see likely procedures with their sources."
         :candidate "Candidate" :due "Deadline" :submit-to "Submit to" :source "Source" :verify "Check source"
         :verifying "Checking…" :verified "Matches the recorded source" :changed "The source changed. The institution pack needs review"
@@ -56,7 +60,10 @@
         :agency "Agency" :role "Staff role" :role/intake "Intake" :role/viewer "View only" :prepare "Prepare intake"
         :no-packet "No packet yet. Make one in the Shakai tab."
         :ready "Prepared for intake only. A person decides acceptance and review." :decision-none "Decision: none" :handoff "Handed to: case reviewer"
-        :blocked "Stopped" :undetermined "No conclusion" :host-unavailable "Not connected to the host"}})
+        :blocked "Stopped" :undetermined "No conclusion" :host-unavailable "Not connected to the host"
+        :local-refs "Local rules at the destination (reference only, not a procedure)" :ref-line "{title} ({issuer}, retrieved {date})"
+        :no-verify "This source cannot be checked from this screen (its digest at retrieval is recorded)"
+        :packet-jp-only "Packet and Matsuri tests use fictional Japanese data only"}})
 
 (defn t [k] (get-in copy [lang k] (name k)))
 
@@ -162,7 +169,7 @@
                             :jurisdiction {:country :jp :subdivision :jp.fixture/city-b} :confirmed? false}})
 
 (defn- place [country sub]
-  (if (= country :us) {:country :us} {:country :jp :subdivision sub}))
+  (if (= country :us) {:country :us} {:country country :subdivision sub}))
 
 (defn- shakai-facts [{:keys [country from to moved-on confirmed]}]
   {:person "local-user" :event :move :from (place country from) :to (place country to)
@@ -209,7 +216,7 @@
                               :packs packs :today (today)}))))
 
 (defn check-source! [source-id]
-  (let [source (get-in jp [:pack/sources source-id])
+  (let [source (some #(get-in % [:pack/sources source-id]) packs)
         req (statute-request source)]
     (swap! state assoc-in [:checks source-id] :verifying)
     (invoke-host statute-selector req
@@ -264,31 +271,45 @@
     "?"))
 
 (defn- place-name [sub]
-  (or (get-in jp [:pack/subdivisions sub :name]) (str sub)))
+  (or (some #(get-in % [:pack/subdivisions sub :name]) packs) (str sub)))
+
+(defn- verifiable? [source-id]
+  (some? (statute-request (some #(get-in % [:pack/sources source-id]) packs))))
 
 (defn- candidate-view [cand checks]
   (h :article {:class "card"}
      (h :div {:class "row"} (h :h3 {} (:procedure/title cand)) (h :span {:class "tag"} (t :candidate)))
      (h :p {:class "muted"} (str (t :due) ": " (deadline-text (:deadline cand)) "　"
-                                 (t :submit-to) ": " (let [s (:submit-to cand)] (if (keyword? s) (place-name s) (str s)))))
+                                 (t :submit-to) ": " (let [s (:submit-to cand)]
+                                                      (cond (keyword? s) (place-name s)
+                                                            (:name s) (:name s)
+                                                            :else (str s)))))
      (for [src (:sources cand)]
        (let [st (get checks (:id src))]
          (h :div {:class "row"}
             (h :p {:class "muted small"} (tf :source-line {:title (:title src) :issuer (:issuer src) :date (:retrieved-on src)}))
-            (h :button {:type "button" :disabled (= st :verifying) :on {:click #(check-source! (:id src))}} (t :verify))
+            (if (verifiable? (:id src))
+              (h :button {:type "button" :disabled (= st :verifying) :on {:click #(check-source! (:id src))}} (t :verify))
+              (h :span {:class "muted small"} (t :no-verify)))
             (when st (h :span {:class (if (#{:verified :verifying} st) "tag" "tag red") :role "status"}
                         (t (if (= st :host-unavailable) :host-unavailable st)))))))
      (for [u (:unknowns cand)] (h :p {:class "muted small"} (str "? " (name u))))))
 
 (defn- shakai-view [{:keys [shakai plan checks packet]}]
-  (let [subs (into [] (map (fn [[k v]] [k (:name v)]) (:pack/subdivisions jp)))
-        put #(do (swap! state assoc-in [:shakai %1] %2) (swap! state assoc :plan nil :packet nil))]
+  (let [country (:country shakai)
+        subs (into [] (map (fn [[k v]] [k (:name v)]) (:pack/subdivisions (pack-of country))))
+        put #(do (swap! state assoc-in [:shakai %1] %2) (swap! state assoc :plan nil :packet nil))
+        put-country (fn [k]
+                      (let [ks (keys (:pack/subdivisions (pack-of k)))]
+                        (swap! state update :shakai assoc :country k :from (first ks) :to (or (second ks) (first ks)))
+                        (swap! state assoc :plan nil :packet nil)))
+        other (keyword (name country) "other")]
     [(h :section {:class "card"}
         (h :div {:class "row wrap"}
-           (select (:country shakai) [[:jp (t :country/jp)] [:us (t :country/us)]] #(put :country %) "国 / Country")
-           (when (= :jp (:country shakai))
-             [(select (:from shakai) (conj subs [:jp/other (t :other)]) #(put :from %) (t :from))
-              (select (:to shakai) (conj subs [:jp/other (t :other)]) #(put :to %) (t :to))])
+           (select country [[:jp (t :country/jp)] [:se (t :country/se)] [:us (t :country/us)]] put-country "国 / Country")
+           (when (not= :us country)
+             [(select (:from shakai) (conj subs [other (t :other)]) #(put :from %) (t :from))
+              (select (:to shakai) (conj subs [other (t :other)]) #(put :to %) (t :to))])
            (h :label {:class "field"} (h :span {} (t :moved-on))
               (h :input {:type "date" :value (:moved-on shakai) :on {:change #(put :moved-on (.. % -target -value))}})))
         (h :label {:class "check"}
@@ -301,6 +322,14 @@
          (stop-view plan)
          [(when (= :withheld-unreviewed-pack (:submission-proposal plan)) (banner (t :unreviewed) false))
           (for [cand (:candidates plan)] (candidate-view cand checks))
+          (when (seq (:local-references plan))
+            (h :section {:class "card"}
+               (h :h3 {} (t :local-refs))
+               (h :ul {} (for [r (:local-references plan)]
+                           (h :li {:class "muted small"}
+                              (tf :ref-line {:title (:title r) :issuer (:issuer r) :date (:retrieved-on r)}))))))
+          (if (not= :jp country)
+            (h :p {:class "muted small"} (t :packet-jp-only))
           (h :section {:class "card"}
              (h :h3 {} (t :packet))
              (h :p {:class "muted"} (tf :packet-line
@@ -314,7 +343,7 @@
                [(h :p {:role "status"} (t :packet-made))
                 (h :button {:type "button" :on {:click #(do (swap! state assoc :tab :matsuri :intake nil))}} (t :hand-to-matsuri))]
                [(when (c/stopped? packet) (stop-view packet))
-                (h :button {:type "button" :on {:click make-packet!}} (t :make-packet))]))]))]))
+                (h :button {:type "button" :on {:click make-packet!}} (t :make-packet))])))]))]))
 
 (defn- kaisha-view [{:keys [kaisha kaisha-result checks]}]
   (let [put #(do (swap! state assoc-in [:kaisha %1] %2) (swap! state assoc :kaisha-result nil))]
