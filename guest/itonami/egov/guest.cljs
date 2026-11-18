@@ -25,7 +25,12 @@
         :verifying "確認中…" :verified "取得時と一致" :changed "出典が更新されています。制度パックの見直しが必要です"
         :denied "送信しませんでした" :failed "確認できませんでした" :no-digest "digest を計算できませんでした"
         :unreviewed "専門家レビュー前の制度パックです。候補の確認までで、提出は提案しません。"
-        :packet "受け渡し票" :recipient "受領者" :items "項目" :expires "同意の期限" :make-packet "受け渡し票を作る"
+        :packet "受け渡し票" :make-packet "受け渡し票を作る"
+        :deadline/within "{due} まで（{days}日以内）" :deadline/before "{date} より前"
+        :source-line "出典: {title}（{issuer}, {date} 取得）"
+        :packet-line "受領者: {recipient}　項目: {items}　同意の期限: {date}" :list-sep "・"
+        :item/principal-ref "本人の参照" :item/address "住所" :item/moved-on "異動日" :item/procedures "手続き"
+        :recipient/city-b "架空市B 市民課（テスト用）"
         :packet-made "受け渡し票を作りました（この端末内のテスト用。送信はしていません）" :hand-to-matsuri "Matsuri タブで開く"
         :form "組織形態" :form/kk "株式会社" :form/ippan "一般社団法人" :rep "代表権を確認した（代表者本人か、期限内の委任）"
         :agency "機関" :role "担当者の役割" :role/intake "受付" :role/viewer "閲覧のみ" :prepare "受付準備をする"
@@ -40,7 +45,12 @@
         :verifying "Checking…" :verified "Matches the recorded source" :changed "The source changed. The institution pack needs review"
         :denied "Nothing was sent" :failed "Could not check" :no-digest "Could not compute the digest"
         :unreviewed "This institution pack has not been reviewed by an expert. Candidates only; no submission is proposed."
-        :packet "Handoff packet" :recipient "Recipient" :items "Items" :expires "Consent expires" :make-packet "Make packet"
+        :packet "Handoff packet" :make-packet "Make packet"
+        :deadline/within "by {due} (within {days} days)" :deadline/before "before {date}"
+        :source-line "Source: {title} ({issuer}, retrieved {date})"
+        :packet-line "Recipient: {recipient}  Items: {items}  Consent expires: {date}" :list-sep ", "
+        :item/principal-ref "Your reference" :item/address "Address" :item/moved-on "Move date" :item/procedures "Procedures"
+        :recipient/city-b "Fictional City B residents' office (test)"
         :packet-made "Packet made (test handoff on this device; nothing was sent)" :hand-to-matsuri "Open in Matsuri"
         :form "Entity form" :form/kk "Kabushiki kaisha" :form/ippan "General incorporated association" :rep "Representation confirmed (the representative or a valid delegation)"
         :agency "Agency" :role "Staff role" :role/intake "Intake" :role/viewer "View only" :prepare "Prepare intake"
@@ -49,6 +59,11 @@
         :blocked "Stopped" :undetermined "No conclusion" :host-unavailable "Not connected to the host"}})
 
 (defn t [k] (get-in copy [lang k] (name k)))
+
+(defn tf
+  "Complete message with named placeholders, e.g. (tf :source-line {:title ..})."
+  [k vars]
+  (str/replace (t k) #"\{([a-z-]+)\}" (fn [[_ v]] (str (get vars (keyword v) "")))))
 
 (def reason-text
   {:ja {:no-authority "権限がありません" :ambiguous-address "住所が確定していません"
@@ -159,14 +174,20 @@
            :plan (c/shakai-plan {:packs packs :today (today) :facts (shakai-facts s)
                                  :grant {:actor :self :principal "local-user" :scope #{:plan}}}))))
 
+(def packet-items #{:principal-ref :from :to :moved-on :procedures})
+(def packet-item-labels
+  "Display order. :from and :to are both shown as the address."
+  [[:principal-ref #{:principal-ref}] [:address #{:from :to}] [:moved-on #{:moved-on}] [:procedures #{:procedures}]])
+(defn- consent-expiry [] (c/add-days (today) 30))
+
 (defn make-packet! []
   (let [s (:shakai @state)]
     (swap! state assoc :packet
            (c/share-packet {:plan (:plan @state) :facts (shakai-facts s) :today (today)
                             :consent {:decision :approved :recipient :jp.fixture/city-b-office
                                       :purpose :address-change-intake
-                                      :items #{:principal-ref :from :to :moved-on :procedures}
-                                      :expires (c/add-days (today) 30)}}))))
+                                      :items packet-items
+                                      :expires (consent-expiry)}}))))
 
 (defn run-kaisha! []
   (let [{:keys [form rep moved-on]} (:kaisha @state)]
@@ -236,10 +257,10 @@
 (defn- stop-view [r]
   (banner (str (t (:status r)) ": " (reason (:reason r))) (= :blocked (:status r))))
 
-(defn- deadline-text [{:keys [kind due due-before]}]
+(defn- deadline-text [{:keys [kind due due-before days]}]
   (case kind
-    :within-days (str due (if (= lang :ja) " まで" ""))
-    :before (str (if (= lang :ja) "" "before ") due-before (if (= lang :ja) " より前" ""))
+    :within-days (tf :deadline/within {:due due :days days})
+    :before (tf :deadline/before {:date due-before})
     "?"))
 
 (defn- place-name [sub]
@@ -253,7 +274,7 @@
      (for [src (:sources cand)]
        (let [st (get checks (:id src))]
          (h :div {:class "row"}
-            (h :p {:class "muted small"} (str (t :source) ": " (:title src) "（" (:issuer src) ", " (:retrieved-on src) "）"))
+            (h :p {:class "muted small"} (tf :source-line {:title (:title src) :issuer (:issuer src) :date (:retrieved-on src)}))
             (h :button {:type "button" :disabled (= st :verifying) :on {:click #(check-source! (:id src))}} (t :verify))
             (when st (h :span {:class (if (#{:verified :verifying} st) "tag" "tag red") :role "status"}
                         (t (if (= st :host-unavailable) :host-unavailable st)))))))
@@ -282,7 +303,13 @@
           (for [cand (:candidates plan)] (candidate-view cand checks))
           (h :section {:class "card"}
              (h :h3 {} (t :packet))
-             (h :p {:class "muted"} (str (t :recipient) ": 架空市B 市民課　" (t :items) ": from / to / moved-on / procedures　" (t :expires) ": +30d"))
+             (h :p {:class "muted"} (tf :packet-line
+                                       {:recipient (t :recipient/city-b)
+                                        :items (str/join (t :list-sep)
+                                                         (for [[label ks] packet-item-labels
+                                                               :when (some packet-items ks)]
+                                                           (t (keyword "item" (name label)))))
+                                        :date (consent-expiry)}))
              (if (= :packet (:status packet))
                [(h :p {:role "status"} (t :packet-made))
                 (h :button {:type "button" :on {:click #(do (swap! state assoc :tab :matsuri :intake nil))}} (t :hand-to-matsuri))]
