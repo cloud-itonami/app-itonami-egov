@@ -129,6 +129,57 @@
          (:reason (plan :facts (assoc f/move-facts :to {:country :jp :subdivision :jp/real-city}))))
       "パックにない市町村は推測しない"))
 
+;; AWAI-3421: スウェーデン（Göteborgs kommun）。届出先は国の機関で、市町村は参考情報だけを持つ
+(deftest se-move-to-goteborg
+  (let [p (plan :facts f/se-move-facts)
+        cand (first (:candidates p))]
+    (is (= :candidates (:status p)))
+    (is (= [:se/flyttanmalan] (mapv :procedure/id (:candidates p))))
+    (is (= {:kind :within-days :days 7 :from "2026-11-20" :due "2026-11-27"} (:deadline cand))
+        "25 §: 引越しから 1 週間以内")
+    (is (= {:agency :se/skatteverket :name "Skatteverket"} (:submit-to cand))
+        "提出先は市町村ではなく Skatteverket")
+    (is (= "bdaa12bc4ea3eb5cb6b3fab600325820e299cf3193e45de98e2de7bdf2b0bf7d"
+           (get-in cand [:sources 0 :sha256])))
+    (is (= :withheld-unreviewed-pack (:submission-proposal p)))
+    (is (= #{:se.goteborg/lokala-ordningsforeskrifter :se.goteborg/stadsmiljopolicy}
+           (set (map :id (:local-references p))))
+        "転入先 Göteborg の条例・方針を参考として返す")
+    (is (every? :sha256 (:local-references p))))
+  (testing "同じ市町村内の引越しにも同じ届出"
+    (let [g {:country :se :subdivision :se.kommun/goteborg}
+          p (plan :facts (assoc f/se-move-facts :from g :to g))]
+      (is (= [:se/flyttanmalan] (mapv :procedure/id (:candidates p))))))
+  (testing "参考情報のない市町村では空"
+    (let [a {:country :se :subdivision :se.fixture/kommun-a}
+          p (plan :facts (assoc f/se-move-facts :to a))]
+      (is (= [] (:local-references p))))))
+
+(deftest se-negative-controls
+  (is (= :unknown-subdivision
+         (:reason (plan :facts (assoc f/se-move-facts :to {:country :se :subdivision :se.kommun/stockholm}))))
+      "パックにない kommun は推測しない")
+  (is (= :pack-not-current (:reason (plan :facts f/se-move-facts :today "2027-03-01"))))
+  (is (= :no-authority (:reason (plan :facts f/se-move-facts :grant nil))))
+  (is (= :cross-border-not-supported
+         (:reason (plan :facts (assoc f/se-move-facts :from {:country :jp :subdivision :jp.fixture/city-a})))))
+  (testing "Göteborgs kommun の窓口は Skatteverket への届出を扱わない"
+    (let [p (plan :facts f/se-move-facts)
+          consent (assoc f/consent :recipient :se.fixture/goteborg-office)
+          packet (c/share-packet {:plan p :facts f/se-move-facts :consent consent :today f/today})
+          office {:id :se.fixture/goteborg-office :name "Göteborg kontor（テスト用）"
+                  :jurisdiction {:country :se :subdivision :se.kommun/goteborg} :confirmed? true}
+          r (c/matsuri-intake {:packet packet :agency office
+                               :staff {:id "fixture-staff-se" :agency :se.fixture/goteborg-office :roles #{:intake}}
+                               :packs f/packs :today f/today})]
+      (is (= :not-this-agency (:reason r))))))
+
+(deftest applies-when-set-or-keyword
+  (is (c/applies? :head-office-move :head-office-move))
+  (is (c/applies? #{:a :b} :b))
+  (is (not (c/applies? #{:a :b} :c)))
+  (is (not (c/applies? nil :a))))
+
 (deftest submission-without-receipt-is-not-done
   (is (= :not-submitted (c/submission-status {:submitted? false})))
   (is (= :submitted-unconfirmed (c/submission-status {:submitted? true})))
