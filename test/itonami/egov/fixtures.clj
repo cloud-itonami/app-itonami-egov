@@ -5,7 +5,9 @@
 (def packs
   [(edn/read-string (slurp "seido/jp.edn"))
    (edn/read-string (slurp "seido/us.edn"))
-   (edn/read-string (slurp "seido/se.edn"))])
+   (edn/read-string (slurp "seido/se.edn"))
+   (edn/read-string (slurp "seido/de.edn"))
+   (edn/read-string (slurp "seido/at.edn"))])
 
 (def today "2026-11-18")
 
