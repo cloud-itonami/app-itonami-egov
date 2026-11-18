@@ -174,6 +174,70 @@
                                :packs f/packs :today f/today})]
       (is (= :not-this-agency (:reason r))))))
 
+(defn- move [country from to]
+  {:person f/person :event :move
+   :from {:country country :subdivision from} :to {:country country :subdivision to}
+   :moved-on "2026-11-20" :address-confirmed? true})
+
+;; AWAI-3448: ドイツ（Berlin・München）とオーストリア（Wien）。届出先は転入先の Meldebehörde
+(deftest de-move-to-berlin
+  (let [p (plan :facts (move :de :de.stadt/muenchen :de.land/berlin))
+        cand (first (:candidates p))]
+    (is (= :candidates (:status p)))
+    (is (= [:de/anmeldung] (mapv :procedure/id (:candidates p))))
+    (is (= {:kind :within-days :days 14 :from "2026-11-20" :due "2026-12-04"} (:deadline cand))
+        "§ 17 Abs. 1: 転入後 2 週間以内")
+    (is (= :de.land/berlin (:submit-to cand)))
+    (is (= [:de/competent-meldebehoerde-not-in-cited-section] (:unknowns cand)))
+    (is (= "c377275ab2ce15f8393536c53549b96c22c6b31b06f37e87ac8ab0ee4c1905cb"
+           (get-in cand [:sources 0 :sha256])))
+    (is (= #{:de.berlin/informationsfreiheitsgesetz :de.berlin/datenschutzgesetz}
+           (set (map :id (:local-references p)))))
+    (is (= :withheld-unreviewed-pack (:submission-proposal p))))
+  (testing "München への転入では München の参考情報"
+    (is (= #{:de.muenchen/gruenanlagensatzung :de.muenchen/strassenreinigungssatzung}
+           (set (map :id (:local-references (plan :facts (move :de :de.land/berlin :de.stadt/muenchen))))))))
+
+(deftest de-matsuri-berlin-office-prepares-intake
+  (let [facts (move :de :de.stadt/muenchen :de.land/berlin)
+        p (plan :facts facts)
+        office {:id :de.fixture/berlin-office :name "Berlin Bürgeramt（テスト用）"
+                :jurisdiction {:country :de :subdivision :de.land/berlin} :confirmed? true}
+        packet (c/share-packet {:plan p :facts facts :consent (assoc f/consent :recipient :de.fixture/berlin-office)
+                                :today f/today})
+        run #(c/matsuri-intake {:packet packet :agency %1
+                                :staff {:id "fixture-staff-de" :agency (:id %1) :roles #{:intake}}
+                                :packs f/packs :today f/today})
+        r (run office)]
+    (is (= :ready-for-human-review (:status r)))
+    (is (nil? (:decision r)))
+    (is (= [:de/anmeldung] (:procedures r)))
+    (is (= ["この手続きの確認項目は未収録。担当者が確認する"] (:checklist r))
+        "DE の確認項目は収録していないので、作らずに担当者へ返す")
+    (testing "München の窓口あての受け渡し票ではない"
+      (is (= :wrong-recipient
+             (:reason (run (assoc office :id :de.fixture/muenchen-office
+                                  :jurisdiction {:country :de :subdivision :de.stadt/muenchen})))))))))
+
+(deftest at-move-to-wien
+  (let [p (plan :facts (move :at :at.fixture/gemeinde-a :at.gemeinde/wien))
+        cand (first (:candidates p))]
+    (is (= [:at/anmeldung] (mapv :procedure/id (:candidates p))))
+    (is (= "2026-11-23" (get-in cand [:deadline :due])) "§ 3 Abs. 1: 3 日以内")
+    (is (= :at.gemeinde/wien (:submit-to cand)))
+    (is (= [:at.wien/bauordnung-geschichte] (mapv :id (:local-references p))))))
+
+(deftest de-at-negative-controls
+  (is (= :unknown-subdivision (:reason (plan :facts (move :de :de.land/berlin :de.stadt/hamburg))))
+      "パックにない市町村は推測しない")
+  (is (= :unknown-subdivision (:reason (plan :facts (move :at :at.gemeinde/wien :at.gemeinde/graz)))))
+  (is (= :pack-not-current (:reason (plan :facts (move :de :de.land/berlin :de.stadt/muenchen) :today "2027-03-01"))))
+  (is (= :pack-not-current (:reason (plan :facts (move :at :at.gemeinde/wien :at.gemeinde/wien) :today "2027-03-01"))))
+  (is (= :no-authority (:reason (plan :facts (move :de :de.land/berlin :de.stadt/muenchen) :grant nil))))
+  (is (= :cross-border-not-supported
+         (:reason (plan :facts (assoc (move :de :de.land/berlin :de.land/berlin)
+                                      :to {:country :at :subdivision :at.gemeinde/wien}))))))
+
 (deftest applies-when-set-or-keyword
   (is (c/applies? :head-office-move :head-office-move))
   (is (c/applies? #{:a :b} :b))

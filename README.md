@@ -18,6 +18,8 @@
 | `seido/jp.edn` | 住民基本台帳法 第22〜24条（転入・転居・転出届）、会社法 第915条（変更の登記） | 出典は e-Gov 法令 API v2 で 2026-11-18 に取得し sha256 を記録。専門家レビュー前。市町村は架空の 2 つだけ |
 | `seido/us.edn` | 骨組みだけ | 州を指定しなければ未確定。州の手続きは未収録 |
 | `seido/se.edn` | Folkbokföringslag (1991:481) 25 §（flyttanmälan。届出先は Skatteverket、1 週間以内） | 出典は data.riksdagen.se で 2026-11-18 に取得し文書全体の sha256 を記録。専門家レビュー前。実在の市町村は Göteborgs kommun（AWAI-3421）だけで、条例・方針 2 件を参考情報として持つ |
+| `seido/de.edn` | Bundesmeldegesetz § 17 Abs. 1（Anmeldung、転入後 2 週間以内、転入先の Meldebehörde） | 出典は gesetze-im-internet.de（非公式の統合版）で 2026-11-18 に取得し § 17 のページの sha256 を記録。改正状態は xml.zip の standangabe。実在の subdivision は Land Berlin と Landeshauptstadt München（AWAI-3448） |
+| `seido/at.edn` | Meldegesetz 1991 § 3 Abs. 1（3 日以内、Meldebehörde） | 出典は RIS の OGD API で 2026-11-18 に取得（NOR40257117、2023-12-12 から有効）。実在の subdivision は Wien（AWAI-3448） |
 
 市町村の条例・方針は手続きではない。`:pack/subdivisions` の `:references` に参考として置き、Shakai は転入先の分を `:local-references` として返す。
 参考情報の元は itonami registry の `skills/knowledge/municipal-ordinance-knowledge`（62 市町村。元の municipality repo は AWAI-3088 で registry に移った）。

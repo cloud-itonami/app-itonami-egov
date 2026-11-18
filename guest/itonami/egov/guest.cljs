@@ -20,7 +20,7 @@
 (def copy
   {:ja {:title "Gyosei" :tab/shakai "国民 · Shakai" :tab/kaisha "組織 · Kaisha" :tab/matsuri "政府 · Matsuri"
         :from "転出元" :to "転入先" :moved-on "異動日" :confirmed "住所が確定している" :plan "候補を出す"
-        :country/jp "日本" :country/us "米国（州は未指定）" :country/se "スウェーデン" :other "パックにない市町村"
+        :country/jp "日本" :country/us "米国（州は未指定）" :country/se "スウェーデン" :country/de "ドイツ" :country/at "オーストリア" :other "パックにない市町村"
         :intro "住所変更の事実を入れると、必要になりそうな手続きを出典つきで出します。"
         :candidate "候補" :due "期限" :submit-to "提出先" :source "出典" :verify "出典を確認"
         :verifying "確認中…" :verified "取得時と一致" :changed "出典が更新されています。制度パックの見直しが必要です"
@@ -43,7 +43,7 @@
         :packet-jp-only "受け渡し票と Matsuri のテストは日本の架空データだけです"}
    :en {:title "Gyosei" :tab/shakai "People · Shakai" :tab/kaisha "Organizations · Kaisha" :tab/matsuri "Government · Matsuri"
         :from "Moving from" :to "Moving to" :moved-on "Move date" :confirmed "The address is confirmed" :plan "Show candidates"
-        :country/jp "Japan" :country/us "United States (no state)" :country/se "Sweden" :other "Municipality not in the pack"
+        :country/jp "Japan" :country/us "United States (no state)" :country/se "Sweden" :country/de "Germany" :country/at "Austria" :other "Municipality not in the pack"
         :intro "Enter the facts of an address change to see likely procedures with their sources."
         :candidate "Candidate" :due "Deadline" :submit-to "Submit to" :source "Source" :verify "Check source"
         :verifying "Checking…" :verified "Matches the recorded source" :changed "The source changed. The institution pack needs review"
@@ -306,7 +306,7 @@
         other (keyword (name country) "other")]
     [(h :section {:class "card"}
         (h :div {:class "row wrap"}
-           (select country [[:jp (t :country/jp)] [:se (t :country/se)] [:us (t :country/us)]] put-country "国 / Country")
+           (select country [[:jp (t :country/jp)] [:de (t :country/de)] [:at (t :country/at)] [:se (t :country/se)] [:us (t :country/us)]] put-country "国 / Country")
            (when (not= :us country)
              [(select (:from shakai) (conj subs [other (t :other)]) #(put :from %) (t :from))
               (select (:to shakai) (conj subs [other (t :other)]) #(put :to %) (t :to))])

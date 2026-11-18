@@ -3,4 +3,4 @@
   (:require [clojure.edn :as edn]))
 
 (defmacro bundled-packs []
-  (mapv #(edn/read-string (slurp %)) ["seido/jp.edn" "seido/us.edn" "seido/se.edn"]))
+  (mapv #(edn/read-string (slurp %)) ["seido/jp.edn" "seido/us.edn" "seido/se.edn" "seido/de.edn" "seido/at.edn"]))
