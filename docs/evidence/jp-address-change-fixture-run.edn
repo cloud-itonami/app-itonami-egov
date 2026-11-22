@@ -1,6 +1,6 @@
 ;; 架空データによる通しの記録（AWAI-3147）。実在の人・自治体・提出は含まない。
 ;; 生成: bb fixture-run
-{:run/today "2026-11-18",
+{:run/today "2026-11-23",
  :run/fixtures
  {:facts
   {:person "fixture-person-1",
@@ -67,7 +67,7 @@
     :unknowns []}],
   :pack
   {:id :jp/residence-and-corporate-address,
-   :version "2026.11.18-1",
+   :version "2026.11.23-1",
    :review :unreviewed,
    :review-by "2027-02-18"},
   :submission-proposal :withheld-unreviewed-pack,
@@ -80,7 +80,7 @@
   :packet/expires "2026-12-31",
   :packet/pack
   {:id :jp/residence-and-corporate-address,
-   :version "2026.11.18-1",
+   :version "2026.11.23-1",
    :review :unreviewed,
    :review-by "2027-02-18"},
   :packet/items
@@ -102,7 +102,7 @@
    "転入日から14日以内かを担当者が確認し、過ぎていれば扱いを担当者が判断する"],
   :pack
   {:id :jp/residence-and-corporate-address,
-   :version "2026.11.18-1",
+   :version "2026.11.23-1",
    :review :unreviewed,
    :review-by "2027-02-18"},
   :decision nil},

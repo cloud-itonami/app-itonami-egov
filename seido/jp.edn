@@ -1,9 +1,10 @@
 ;; 制度パック: 日本（国の法令レベル）
-;; 出典は e-Gov 法令 API v2 で 2026-11-18 に取得し、応答 JSON の sha256 を記録した。
+;; 出典は e-Gov 法令 API v2 で 2026-11-18 と 2026-11-23 に取得し、応答 JSON の sha256 を記録した
+;; （AWAI-3780 で戸籍法 第49条・第86条と住民基本台帳法 第30条の46を追加）。
 ;; 専門家レビューは未実施。:review/status :unreviewed の間は「候補」の提示だけを許し、
 ;; 提出の提案はしない（AWAI-155）。
 {:pack/id :jp/residence-and-corporate-address
- :pack/version "2026.11.18-1"
+ :pack/version "2026.11.23-1"
  :pack/jurisdiction [:jp]
  :pack/language :ja
  ;; 国の法令だけで候補を出せるが、窓口・様式は市町村ごとに違うので、
@@ -12,7 +13,7 @@
  :pack/subdivisions
  {:jp.fixture/city-a {:name "架空市A（テスト用・実在しない）" :fixture true}
   :jp.fixture/city-b {:name "架空市B（テスト用・実在しない）" :fixture true}}
- :pack/checked-on "2026-11-18"
+ :pack/checked-on "2026-11-23"
  :pack/review-by "2027-02-18"
  :review/status :unreviewed
  :review/reviewer nil
@@ -53,7 +54,34 @@
    :law-revision-id "417AC0000000086_20260812_508AC0000000064"
    :in-force-from "2026-08-12"
    :retrieved-on "2026-11-18"
-   :sha256 "48bdca4c76f3685e4463760d511a9cb9aae5d5c981d6b4ee03b57501aab6321a"}}
+   :sha256 "48bdca4c76f3685e4463760d511a9cb9aae5d5c981d6b4ee03b57501aab6321a"}
+  :jp.law/koseki-49
+  {:title "戸籍法 第49条（出生届）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/322AC0000000224"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/322AC0000000224?law_full_text_format=json&elm=MainProvision-Article_49"
+   :law-revision-id "322AC0000000224_20260903_508AC0000000027"
+   :in-force-from "2026-09-03"
+   :retrieved-on "2026-11-23"
+   :sha256 "e160c11b1cdd57d3113d127890dbcdba1c0ad17a64107004594f4f65fbbb13e2"}
+  :jp.law/koseki-86
+  {:title "戸籍法 第86条（死亡届）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/322AC0000000224"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/322AC0000000224?law_full_text_format=json&elm=MainProvision-Article_86"
+   :law-revision-id "322AC0000000224_20260903_508AC0000000027"
+   :in-force-from "2026-09-03"
+   :retrieved-on "2026-11-23"
+   :sha256 "b559e46a2c690b4c5c6844d7d841eb551a8d05dcb05f4f42e2bc8cc36c5e4ff8"}
+  :jp.law/jumin-30-46
+  {:title "住民基本台帳法 第30条の46（中長期在留者等が住所を定めた場合の転入届の特例）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/342AC0000000081"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/342AC0000000081?law_full_text_format=json&elm=MainProvision-Article_30_46"
+   :law-revision-id "342AC0000000081_20261024_508AC0000000066"
+   :in-force-from "2026-10-24"
+   :retrieved-on "2026-11-23"
+   :sha256 "360bbb25492b5af0a2ef64775bdc22b7ee33bcff6b84e408be06d973df5966f4"}}
  :pack/procedures
  [{:procedure/id :jp/tenshutsu-todoke
    :procedure/title "転出届"
@@ -84,4 +112,32 @@
    :submit-to :registry-office
    ;; 管轄の異なる登記所へ移る場合の扱い（会社法 第916条）は未収録。
    :unknowns [:jp/honten-iten-across-registry-offices]
-   :sources [:jp.law/kaisha-915]}]}
+   :sources [:jp.law/kaisha-915]}
+  {:procedure/id :jp/shusshin-todoke
+   :procedure/title "出生届"
+   :subject :person
+   :applies-when :birth
+   ;; 第49条第1項は国外出生で3箇月以内と定めるが、出生地の国を事実に持たないため国内の14日だけを符号化する。
+   :deadline {:kind :within-days :days 14 :anchor :born-on}
+   :submit-to :to-municipality
+   :unknowns [:jp/birth-abroad-3-month-period-not-encoded]
+   :sources [:jp.law/koseki-49]}
+  {:procedure/id :jp/shibou-todoke
+   :procedure/title "死亡届"
+   :subject :person
+   :applies-when :death
+   ;; 第86条第1項は「死亡の事実を知った日から7日以内」（国外では3箇月以内）。事実は :died-on だけを持つため、
+   ;; 指示どおり :died-on を起算点とし、国外の期間と「知った日」の起算は符号化しない。
+   :deadline {:kind :within-days :days 7 :anchor :died-on}
+   :submit-to :to-municipality
+   :unknowns [:jp/death-abroad-period-not-encoded :jp/death-deadline-anchor-is-knowledge-date]
+   :sources [:jp.law/koseki-86]}
+  {:procedure/id :jp/gaikokujin-tennyu-todoke
+   :procedure/title "外国人住民転入届（中長期在留者等）"
+   :subject :person
+   :applies-when :foreign-resident-move
+   ;; 第30条の46は国外から転入した場合の特例で、対象は第30条の45の表の区分。区分表は符号化しない。
+   :deadline {:kind :within-days :days 14 :anchor :moved-on}
+   :submit-to :to-municipality
+   :unknowns [:jp/foreign-resident-category-table-not-encoded]
+   :sources [:jp.law/jumin-30-46]}]}

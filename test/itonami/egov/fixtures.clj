@@ -9,7 +9,7 @@
    (edn/read-string (slurp "seido/de.edn"))
    (edn/read-string (slurp "seido/at.edn"))])
 
-(def today "2026-11-18")
+(def today "2026-11-23")
 
 (def person "fixture-person-1")
 
@@ -59,3 +59,25 @@
    :address-confirmed? true})
 
 (def org-grant {:actor :delegate :principal org :scope #{:plan} :expires "2026-12-31"})
+
+;; AWAI-3780: 出生・死亡・外国人住民の住所届。:to は届出先の市町村。
+(def birth-facts
+  {:person person
+   :event :birth
+   :born-on "2026-11-20"
+   :to {:country :jp :subdivision :jp.fixture/city-b}})
+
+(def death-facts
+  {:person person
+   :event :death
+   :died-on "2026-11-20"
+   :to {:country :jp :subdivision :jp.fixture/city-b}})
+
+;; 国外から転入した外国人住民（第30条の46）。転出元は国外で、パックの法域ではないため :from は持たない。
+(def foreign-resident-facts
+  {:person person
+   :event :foreign-resident-move
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :moved-on "2026-11-20"
+   :nationalities #{:kr}
+   :residence-status :medium-long-term-resident})

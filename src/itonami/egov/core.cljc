@@ -177,45 +177,98 @@
 ;; ---------------------------------------------------------------------------
 ;; Shakai（国民側：個人・家族）
 
+(defn- candidates-result
+  "候補結果の形（Shakai 共通）。when* は手続きの :applies-when として判定した場面。"
+  [pack facts person when* procs]
+  (let [refs (get-in pack [:pack/subdivisions (:subdivision (:to facts)) :references])]
+    {:status :candidates
+     :principal person
+     :applies-when when*
+     :candidates (mapv #(candidate pack facts %) procs)
+     :pack {:id (:pack/id pack) :version (:pack/version pack)
+            :review (:review/status pack) :review-by (:pack/review-by pack)}
+     :submission-proposal (review-gate pack)
+     ;; 転入先の市町村の条例・方針。手続きではなく、所在を示す参考情報。
+     :local-references (vec refs)
+     :note "候補の一覧であり、届出の要否や受理を決めるのは当局。"}))
+
+(defn- foreign-resident-gate
+  "外国人住民の届出の候補条件（AWAI-3780）。国籍が日本のみでないことと在留状態の確認が必要。
+  どちらかが不明なら :undetermined が、不足している理由キーを含めて返る。"
+  [facts]
+  (let [nats (:nationalities facts)
+        nats (cond (keyword? nats) [nats]
+                   (coll? nats) (vec nats)
+                   :else nil)
+        rs (:residence-status facts)
+        rs-present? (and (some? rs) (not= "" rs) (not= :unknown rs) (not= "unknown" rs))]
+    (cond
+      (empty? nats) (undetermined :nationality-missing)
+      (every? #(= :jp %) nats) (undetermined :not-foreign-resident :nationalities nats)
+      (not rs-present?) (undetermined :residence-status-missing :nationalities nats)
+      :else nil)))
+
 (defn shakai-plan
-  "住所変更の候補手続きを出す。facts の例:
+  "候補手続きを出す。facts の例（住所変更）:
   {:person \"fixture-person-1\" :event :move
    :from {:country :jp :subdivision :jp.fixture/city-a}
    :to   {:country :jp :subdivision :jp.fixture/city-b}
-   :moved-on \"2026-11-20\" :address-confirmed? true}"
+   :moved-on \"2026-11-20\" :address-confirmed? true}
+  出生・死亡・外国人住民の住所届（国外からの転入）は :event :birth / :death /
+  :foreign-resident-move で出し、:to を届出先の市町村、:born-on / :died-on / :moved-on を起算点とする。
+  外国人住民は :nationalities（複数可）と :residence-status も要る。普通の :move では
+  外国人住民の手続きは候補にしない（第30条の46は国外からの転入の特例のため）。"
   [{:keys [packs today grant facts]}]
-  (let [{:keys [person from to moved-on address-confirmed?]} facts]
+  (let [{:keys [person from to moved-on born-on died-on address-confirmed?]} facts
+        event (or (:event facts) :move)]
     (cond
       (not (grant-allows? grant person :plan today)) (blocked :no-authority)
-      (not= (:country from) (:country to)) (undetermined :cross-border-not-supported)
-      (not address-confirmed?) (undetermined :ambiguous-address)
-      (nil? (date->day moved-on)) (undetermined :moved-on-missing)
+      (not (contains? #{:move :birth :death :foreign-resident-move} event))
+      (undetermined :unsupported-event :event event)
+      (= event :move)
+      (cond
+        (not= (:country from) (:country to)) (undetermined :cross-border-not-supported)
+        (not address-confirmed?) (undetermined :ambiguous-address)
+        (nil? (date->day moved-on)) (undetermined :moved-on-missing)
+        :else
+        (let [ctx-from (resolve-jurisdiction packs today from)
+              ctx-to (resolve-jurisdiction packs today to)]
+          (cond
+            (stopped? ctx-from) ctx-from
+            (stopped? ctx-to) ctx-to
+            :else
+            (let [pack (:pack ctx-to)
+                  when* (if (= (:subdivision from) (:subdivision to))
+                          :move-within-municipality
+                          :move-between-municipalities)
+                  procs (filter #(and (= :person (:subject %)) (applies? (:applies-when %) when*))
+                                (:pack/procedures pack))]
+              (if (empty? procs)
+                (undetermined :no-procedure-in-pack :applies-when when*)
+                (candidates-result pack facts person when* procs))))))
       :else
-      (let [ctx-from (resolve-jurisdiction packs today from)
-            ctx-to (resolve-jurisdiction packs today to)]
-        (cond
-          (stopped? ctx-from) ctx-from
-          (stopped? ctx-to) ctx-to
-          :else
-          (let [pack (:pack ctx-to)
-                when* (if (= (:subdivision from) (:subdivision to))
-                        :move-within-municipality
-                        :move-between-municipalities)
-                procs (filter #(and (= :person (:subject %)) (applies? (:applies-when %) when*))
-                              (:pack/procedures pack))
-                refs (get-in pack [:pack/subdivisions (:subdivision to) :references])]
-            (if (empty? procs)
-              (undetermined :no-procedure-in-pack :applies-when when*)
-              {:status :candidates
-               :principal person
-               :applies-when when*
-               :candidates (mapv #(candidate pack facts %) procs)
-               :pack {:id (:pack/id pack) :version (:pack/version pack)
-                      :review (:review/status pack) :review-by (:pack/review-by pack)}
-               :submission-proposal (review-gate pack)
-               ;; 転入先の市町村の条例・方針。手続きではなく、所在を示す参考情報。
-               :local-references (vec refs)
-               :note "候補の一覧であり、届出の要否や受理を決めるのは当局。"})))))))
+      (let [gate (when (= event :foreign-resident-move) (foreign-resident-gate facts))
+            problem (cond
+                      (and from (not= (:country from) (:country to))) (undetermined :cross-border-not-supported)
+                      (and (= event :birth) (nil? (date->day born-on))) (undetermined :born-on-missing)
+                      (and (= event :death) (nil? (date->day died-on))) (undetermined :died-on-missing)
+                      (and (= event :foreign-resident-move) (nil? (date->day moved-on))) (undetermined :moved-on-missing)
+                      gate gate
+                      :else nil)]
+        (if problem
+          problem
+          (let [ctx-from (when from (resolve-jurisdiction packs today from))
+                ctx-to (resolve-jurisdiction packs today to)]
+            (cond
+              (and ctx-from (stopped? ctx-from)) ctx-from
+              (stopped? ctx-to) ctx-to
+              :else
+              (let [pack (:pack ctx-to)
+                    procs (filter #(and (= :person (:subject %)) (applies? (:applies-when %) event))
+                                  (:pack/procedures pack))]
+                (if (empty? procs)
+                  (undetermined :no-procedure-in-pack :applies-when event)
+                  (candidates-result pack facts person event procs))))))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Kaisha（国民側：法人・団体）
@@ -286,7 +339,14 @@
                       "転入日から14日以内かを担当者が確認し、過ぎていれば扱いを担当者が判断する"]
    :jp/tenkyo-todoke ["届出事項（住民基本台帳法 第23条各号）が揃っているかを担当者が確認する"
                       "転居日から14日以内かを担当者が確認する"]
-   :jp/tenshutsu-todoke ["転出先と転出予定日（住民基本台帳法 第24条）を担当者が確認する"]})
+   :jp/tenshutsu-todoke ["転出先と転出予定日（住民基本台帳法 第24条）を担当者が確認する"]
+   :jp/shusshin-todoke ["届出事項（戸籍法 第49条第2項）が揃っているかを担当者が確認する"
+                       "出生日から14日以内かを担当者が確認し、国外出生の場合は扱いを担当者が判断する"]
+   :jp/shibou-todoke ["届出事項（戸籍法 第86条第2項）が揃っているかを担当者が確認する"
+                      "診断書又は検案書の添付を担当者が確認する"
+                      "死亡の事実を知った日から7日以内かを担当者が確認し、過ぎていれば扱いを担当者が判断する"]
+   :jp/gaikokujin-tennyu-todoke ["届出事項（住民基本台帳法 第30条の46）が揃っているかを担当者が確認する"
+                                 "転入日から14日以内かを担当者が確認する"]})
 
 (defn matsuri-intake
   "受け渡し票を受付準備まで整え、人の審査者へ引き継ぐ。受理・審査・決定はしない。"
