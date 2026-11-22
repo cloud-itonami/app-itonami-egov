@@ -20,8 +20,12 @@
 (def copy
   {:ja {:title "Gyosei" :tab/shakai "国民 · Shakai" :tab/kaisha "組織 · Kaisha" :tab/matsuri "政府 · Matsuri"
         :from "転出元" :to "転入先" :moved-on "異動日" :confirmed "住所が確定している" :plan "候補を出す"
+        :event "事象" :event/move "住所変更" :event/birth "出生" :event/death "死亡" :event/foreign-resident-move "外国人住民の住所届（国外からの転入）"
+        :born-on "出生日" :died-on "死亡日" :place "届出先"
+        :nationalities "国籍（複数可）" :nationality/jp "日本" :nationality/kr "韓国" :nationality/cn "中国" :nationality/us "米国" :nationality/other "その他"
+        :residence-status "在留状態（確認済み）" :residence/unknown "未選択" :residence/medium-long-term-resident "中長期在留者等" :residence/permanent-resident "永住者" :residence/special-permanent-resident "特別永住者" :residence/other-confirmed "その他（確認済み）"
         :country/jp "日本" :country/us "米国（州は未指定）" :country/se "スウェーデン" :country/de "ドイツ" :country/at "オーストリア" :other "パックにない市町村"
-        :intro "住所変更の事実を入れると、必要になりそうな手続きを出典つきで出します。"
+        :intro "住所変更・出生・死亡・外国人住民の住所届の事実を入れると、必要になりそうな手続きを出典つきで出します。"
         :candidate "候補" :due "期限" :submit-to "提出先" :source "出典" :verify "出典を確認"
         :verifying "確認中…" :verified "取得時と一致" :changed "出典が更新されています。制度パックの見直しが必要です"
         :denied "送信しませんでした" :failed "確認できませんでした" :no-digest "digest を計算できませんでした"
@@ -43,8 +47,12 @@
         :packet-jp-only "受け渡し票と Matsuri のテストは日本の架空データだけです"}
    :en {:title "Gyosei" :tab/shakai "People · Shakai" :tab/kaisha "Organizations · Kaisha" :tab/matsuri "Government · Matsuri"
         :from "Moving from" :to "Moving to" :moved-on "Move date" :confirmed "The address is confirmed" :plan "Show candidates"
+        :event "Event" :event/move "Address change" :event/birth "Birth" :event/death "Death" :event/foreign-resident-move "Foreign-resident address notification (move-in from abroad)"
+        :born-on "Birth date" :died-on "Death date" :place "Place of filing"
+        :nationalities "Nationalities (multiple allowed)" :nationality/jp "Japan" :nationality/kr "South Korea" :nationality/cn "China" :nationality/us "United States" :nationality/other "Other"
+        :residence-status "Residence status (confirmed)" :residence/unknown "Not selected" :residence/medium-long-term-resident "Medium-to-long-term resident" :residence/permanent-resident "Permanent resident" :residence/special-permanent-resident "Special permanent resident" :residence/other-confirmed "Other (confirmed)"
         :country/jp "Japan" :country/us "United States (no state)" :country/se "Sweden" :country/de "Germany" :country/at "Austria" :other "Municipality not in the pack"
-        :intro "Enter the facts of an address change to see likely procedures with their sources."
+        :intro "Enter the facts of an address change, birth, death or foreign-resident address notification to see likely procedures with their sources."
         :candidate "Candidate" :due "Deadline" :submit-to "Submit to" :source "Source" :verify "Check source"
         :verifying "Checking…" :verified "Matches the recorded source" :changed "The source changed. The institution pack needs review"
         :denied "Nothing was sent" :failed "Could not check" :no-digest "Could not compute the digest"
@@ -83,7 +91,11 @@
         :unsupported-entity-form "この組織形態の手続きはまだ収録していません"
         :consent-denied "同意がありません" :consent-expired "同意の期限が切れています"
         :agency-unconfirmed "機関の確認が取れていません" :wrong-recipient "この受け渡し票の受領者はこの機関ではありません"
-        :not-this-agency "この機関で扱う手続きがありません" :no-packet "受け渡し票がありません"}
+        :not-this-agency "この機関で扱う手続きがありません" :no-packet "受け渡し票がありません"
+        :born-on-missing "出生日を入れてください" :died-on-missing "死亡日を入れてください"
+        :nationality-missing "国籍を入れてください" :residence-status-missing "在留状態を入れてください"
+        :not-foreign-resident "日本国籍のみです。外国人住民の届出は候補にしません"
+        :unsupported-event "この事象はまだ扱っていません" :jurisdiction-missing "場所を入れてください"}
    :en {:no-authority "No authority" :ambiguous-address "The address is not confirmed"
         :subdivision-required "Procedures cannot be determined until a state or municipality is given"
         :unknown-subdivision "This municipality or state is not in the pack; nothing is guessed"
@@ -94,7 +106,11 @@
         :unsupported-entity-form "Procedures for this entity form are not in the pack yet"
         :consent-denied "No consent" :consent-expired "Consent has expired"
         :agency-unconfirmed "The agency is not confirmed" :wrong-recipient "This packet is addressed to another agency"
-        :not-this-agency "No procedure for this agency" :no-packet "No packet"}})
+        :not-this-agency "No procedure for this agency" :no-packet "No packet"
+        :born-on-missing "Enter the birth date" :died-on-missing "Enter the death date"
+        :nationality-missing "Enter nationality" :residence-status-missing "Enter residence status"
+        :not-foreign-resident "Japanese nationality only; the foreign-resident notification is not a candidate"
+        :unsupported-event "This event is not covered yet" :jurisdiction-missing "Enter the place"}})
 
 (defn reason [k] (get-in reason-text [lang k] (name k)))
 
@@ -155,7 +171,9 @@
 
 (defonce state
   (atom {:tab :shakai
-         :shakai {:country :jp :from :jp.fixture/city-a :to :jp.fixture/city-b :moved-on "2026-11-20" :confirmed true}
+         :shakai {:country :jp :event :move :from :jp.fixture/city-a :to :jp.fixture/city-b
+                  :moved-on "2026-11-20" :born-on "2026-11-20" :died-on "2026-11-20"
+                  :confirmed true :nationalities #{:jp} :residence-status :unknown}
          :plan nil :checks {} :packet nil
          :kaisha {:form :kabushiki-kaisha :rep false :moved-on "2026-11-20"} :kaisha-result nil
          :matsuri {:agency :jp.fixture/city-b-office :role :intake} :intake nil}))
@@ -171,9 +189,16 @@
 (defn- place [country sub]
   (if (= country :us) {:country :us} {:country country :subdivision sub}))
 
-(defn- shakai-facts [{:keys [country from to moved-on confirmed]}]
-  {:person "local-user" :event :move :from (place country from) :to (place country to)
-   :moved-on moved-on :address-confirmed? confirmed})
+(defn- shakai-facts [{:keys [country event from to moved-on born-on died-on confirmed nationalities residence-status]}]
+  (case (or event :move)
+    :birth {:person "local-user" :event :birth :born-on born-on :to (place country to)}
+    :death {:person "local-user" :event :death :died-on died-on :to (place country to)}
+    :foreign-resident-move {:person "local-user" :event :foreign-resident-move
+                            :to (place country to) :moved-on moved-on
+                            :nationalities (when (seq nationalities) (set nationalities))
+                            :residence-status (when (not= :unknown residence-status) residence-status)}
+    {:person "local-user" :event :move :from (place country from) :to (place country to)
+     :moved-on moved-on :address-confirmed? confirmed}))
 
 (defn run-shakai! []
   (let [s (:shakai @state)]
@@ -297,24 +322,53 @@
 
 (defn- shakai-view [{:keys [shakai plan checks packet]}]
   (let [country (:country shakai)
+        event (or (:event shakai) :move)
         subs (into [] (map (fn [[k v]] [k (:name v)]) (:pack/subdivisions (pack-of country))))
         put #(do (swap! state assoc-in [:shakai %1] %2) (swap! state assoc :plan nil :packet nil))
         put-country (fn [k]
                       (let [ks (keys (:pack/subdivisions (pack-of k)))]
                         (swap! state update :shakai assoc :country k :from (first ks) :to (or (second ks) (first ks)))
                         (swap! state assoc :plan nil :packet nil)))
-        other (keyword (name country) "other")]
+        other (keyword (name country) "other")
+        date-field (fn [k label-k] (h :label {:class "field"} (h :span {} (t label-k))
+                                       (h :input {:type "date" :value (k shakai) :on {:change #(put k (.. % -target -value))}})))]
     [(h :section {:class "card"}
         (h :div {:class "row wrap"}
+           (select event [[:move (t :event/move)] [:birth (t :event/birth)] [:death (t :event/death)]
+                            [:foreign-resident-move (t :event/foreign-resident-move)]] #(put :event %) (t :event))
            (select country [[:jp (t :country/jp)] [:de (t :country/de)] [:at (t :country/at)] [:se (t :country/se)] [:us (t :country/us)]] put-country "国 / Country")
            (when (not= :us country)
-             [(select (:from shakai) (conj subs [other (t :other)]) #(put :from %) (t :from))
-              (select (:to shakai) (conj subs [other (t :other)]) #(put :to %) (t :to))])
-           (h :label {:class "field"} (h :span {} (t :moved-on))
-              (h :input {:type "date" :value (:moved-on shakai) :on {:change #(put :moved-on (.. % -target -value))}})))
-        (h :label {:class "check"}
-           (h :input {:type "checkbox" :checked (:confirmed shakai) :on {:change #(put :confirmed (.. % -target -checked))}})
-           (t :confirmed))
+             (case event
+               :move [(select (:from shakai) (conj subs [other (t :other)]) #(put :from %) (t :from))
+                      (select (:to shakai) (conj subs [other (t :other)]) #(put :to %) (t :to))]
+               :foreign-resident-move [(select (:to shakai) (conj subs [other (t :other)]) #(put :to %) (t :to))]
+               [(select (:to shakai) (conj subs [other (t :other)]) #(put :to %) (t :place))]))
+           (case event
+             :birth (date-field :born-on :born-on)
+             :death (date-field :died-on :died-on)
+             (date-field :moved-on :moved-on)))
+        (when (= event :move)
+          (h :label {:class "check"}
+             (h :input {:type "checkbox" :checked (:confirmed shakai) :on {:change #(put :confirmed (.. % -target -checked))}})
+             (t :confirmed)))
+        (when (= event :foreign-resident-move)
+          [(h :div {:class "field"} (h :span {} (t :nationalities))
+             (for [[k label-k] [[:jp :nationality/jp] [:kr :nationality/kr] [:cn :nationality/cn]
+                                 [:us :nationality/us] [:other :nationality/other]]]
+               (h :label {:class "check"}
+                  (h :input {:type "checkbox" :checked (contains? (:nationalities shakai) k)
+                             :on {:change (fn [e] (let [checked (.. e -target -checked)]
+                                                    (put :nationalities (if checked
+                                                                          (conj (:nationalities shakai) k)
+                                                                          (disj (:nationalities shakai) k)))) )}})
+                  (t label-k))))
+           (select (:residence-status shakai)
+                   [[:unknown (t :residence/unknown)]
+                    [:medium-long-term-resident (t :residence/medium-long-term-resident)]
+                    [:permanent-resident (t :residence/permanent-resident)]
+                    [:special-permanent-resident (t :residence/special-permanent-resident)]
+                    [:other-confirmed (t :residence/other-confirmed)]]
+                   #(put :residence-status %) (t :residence-status))])
         (h :button {:type "button" :class "primary" :on {:click run-shakai!}} (t :plan)))
      (if (nil? plan)
        (h :p {:class "muted"} (t :intro))

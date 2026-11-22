@@ -248,3 +248,70 @@
   (is (= :not-submitted (c/submission-status {:submitted? false})))
   (is (= :submitted-unconfirmed (c/submission-status {:submitted? true})))
   (is (= :receipt-recorded (c/submission-status {:submitted? true :receipt {:id "r-1"}}))))
+
+;; AWAI-3780: 出生・死亡・外国人住民の住所届（戸籍法 第49条・第86条、住民基本台帳法 第30条の46）
+(deftest jp-birth
+  (let [p (plan :facts f/birth-facts)
+        cand (first (:candidates p))]
+    (is (= :candidates (:status p)))
+    (is (= :birth (:applies-when p)))
+    (is (= [:jp/shusshin-todoke] (mapv :procedure/id (:candidates p))))
+    (is (= {:kind :within-days :days 14 :from "2026-11-20" :due "2026-12-04"} (:deadline cand))
+        "戸籍法 第49条第1項: 出生から14日以内（国内）")
+    (is (= :jp.fixture/city-b (:submit-to cand)))
+    (is (= "e160c11b1cdd57d3113d127890dbcdba1c0ad17a64107004594f4f65fbbb13e2"
+           (get-in cand [:sources 0 :sha256])))
+    (is (= [:jp/birth-abroad-3-month-period-not-encoded] (:unknowns cand)))
+    (is (= :withheld-unreviewed-pack (:submission-proposal p))))
+  (testing "負の対照"
+    (is (= :born-on-missing (:reason (plan :facts (dissoc f/birth-facts :born-on)))))
+    (is (= :no-authority (:reason (plan :facts f/birth-facts :grant nil))))
+    (is (= :unknown-subdivision
+           (:reason (plan :facts (assoc f/birth-facts :to {:country :jp :subdivision :jp/real-city})))))
+    (is (= :unsupported-event (:reason (plan :facts (assoc f/birth-facts :event :retirement)))))))
+
+(deftest jp-death
+  (let [p (plan :facts f/death-facts)
+        cand (first (:candidates p))]
+    (is (= :candidates (:status p)))
+    (is (= [:jp/shibou-todoke] (mapv :procedure/id (:candidates p))))
+    (is (= {:kind :within-days :days 7 :from "2026-11-20" :due "2026-11-27"} (:deadline cand))
+        "戸籍法 第86条第1項: 7日以内。起算は事実の :died-on（条文は死亡の事実を知った日）")
+    (is (= :jp.fixture/city-b (:submit-to cand)))
+    (is (= "b559e46a2c690b4c5c6844d7d841eb551a8d05dcb05f4f42e2bc8cc36c5e4ff8"
+           (get-in cand [:sources 0 :sha256]))))
+  (testing "負の対照"
+    (is (= :died-on-missing (:reason (plan :facts (dissoc f/death-facts :died-on)))))
+    (is (= :no-authority (:reason (plan :facts f/death-facts :grant nil))))))
+
+(deftest jp-foreign-resident-move
+  (let [p (plan :facts f/foreign-resident-facts)
+        cand (first (:candidates p))]
+    (is (= :candidates (:status p)))
+    (is (= :foreign-resident-move (:applies-when p)))
+    (is (= [:jp/gaikokujin-tennyu-todoke] (mapv :procedure/id (:candidates p))))
+    (is (= {:kind :within-days :days 14 :from "2026-11-20" :due "2026-12-04"} (:deadline cand))
+        "住民基本台帳法 第30条の46: 転入日から14日以内")
+    (is (= :jp.fixture/city-b (:submit-to cand)))
+    (is (= "360bbb25492b5af0a2ef64775bdc22b7ee33bcff6b84e408be06d973df5966f4"
+           (get-in cand [:sources 0 :sha256])))
+    (is (= :withheld-unreviewed-pack (:submission-proposal p))))
+  (testing "複数国籍でも候補になる"
+    (is (= :candidates (:status (plan :facts (assoc f/foreign-resident-facts
+                                                     :nationalities #{:jp :kr}))))))
+  (testing "負の対照: 国籍・在留状態が不明なら未確定"
+    (is (= :nationality-missing (:reason (plan :facts (dissoc f/foreign-resident-facts :nationalities)))))
+    (is (= :not-foreign-resident
+           (:reason (plan :facts (assoc f/foreign-resident-facts :nationalities #{:jp})))))
+    (is (= :residence-status-missing
+           (:reason (plan :facts (dissoc f/foreign-resident-facts :residence-status)))))
+    (is (= :moved-on-missing (:reason (plan :facts (dissoc f/foreign-resident-facts :moved-on)))))
+    (is (= :cross-border-not-supported
+           (:reason (plan :facts (assoc f/foreign-resident-facts
+                                        :from {:country :us :subdivision :us/ca}))))))
+  (testing "普通の住所変更では外国人住民の手続きは候補にしない（jp-address-change-flow の完全一致を保持）"
+    (is (= #{:jp/tenshutsu-todoke :jp/tennyu-todoke}
+           (set (map :procedure/id (:candidates (plan :facts (assoc f/move-facts
+                                                                     :nationalities #{:kr}
+                                                                     :residence-status :medium-long-term-resident))))))
+        "第30条の46は国外からの転入の特例なので、国内の :move には適用しない")))
