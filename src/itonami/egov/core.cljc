@@ -119,11 +119,24 @@
                    :id id)))
         ids))
 
-(defn- deadline [{:keys [kind days anchor]} facts]
+(defn- deadline [{:keys [kind days anchor start-month-day due-month-day]} facts]
   (let [base (get facts anchor)]
     (case kind
       :within-days {:kind :within-days :days days :from base :due (add-days base days)}
       :before {:kind :before :due-before base}
+      :statutory-period (if (some? base)
+                          (let [y (if (number? base) base (parse-int (str base)))]
+                            {:kind :statutory-period
+                             :from (str (inc y) "-" start-month-day)
+                             :due (str (inc y) "-" due-month-day)
+                             :holiday-exception :tsusoku-10})
+                          {:kind :unknown})
+      :statutory-deadline (if (some? base)
+                            (let [y (if (number? base) base (parse-int (str base)))]
+                              {:kind :statutory-deadline
+                               :due (str (inc y) "-" due-month-day)
+                               :holiday-exception :tsusoku-10})
+                            {:kind :unknown})
       {:kind :unknown})))
 
 (defn- submit-to [where facts]
@@ -136,13 +149,14 @@
       nil)))
 
 (defn- candidate [pack facts proc]
-  {:procedure/id (:procedure/id proc)
-   :procedure/title (:procedure/title proc)
-   :standing :candidate ; 候補であって、当局の判断ではない
-   :deadline (deadline (:deadline proc) facts)
-   :submit-to (submit-to (:submit-to proc) facts)
-   :sources (source-refs pack (:sources proc))
-   :unknowns (vec (:unknowns proc))})
+  (cond-> {:procedure/id (:procedure/id proc)
+           :procedure/title (:procedure/title proc)
+           :standing :candidate ; 候補であって、当局の判断ではない
+           :deadline (deadline (:deadline proc) facts)
+           :submit-to (submit-to (:submit-to proc) facts)
+           :sources (source-refs pack (:sources proc))
+           :unknowns (vec (:unknowns proc))}
+    (seq (:forms proc)) (assoc :forms (vec (:forms proc)))))
 
 (defn- review-gate [pack]
   (if (= :reviewed (:review/status pack))
@@ -181,16 +195,19 @@
   "候補結果の形（Shakai 共通）。when* は手続きの :applies-when として判定した場面。"
   [pack facts person when* procs]
   (let [refs (get-in pack [:pack/subdivisions (:subdivision (:to facts)) :references])]
-    {:status :candidates
-     :principal person
-     :applies-when when*
-     :candidates (mapv #(candidate pack facts %) procs)
-     :pack {:id (:pack/id pack) :version (:pack/version pack)
-            :review (:review/status pack) :review-by (:pack/review-by pack)}
-     :submission-proposal (review-gate pack)
-     ;; 転入先の市町村の条例・方針。手続きではなく、所在を示す参考情報。
-     :local-references (vec refs)
-     :note "候補の一覧であり、届出の要否や受理を決めるのは当局。"}))
+    (cond-> {:status :candidates
+             :principal person
+             :applies-when when*
+             :candidates (mapv #(candidate pack facts %) procs)
+             :pack {:id (:pack/id pack) :version (:pack/version pack)
+                    :review (:review/status pack) :review-by (:pack/review-by pack)}
+             :submission-proposal (review-gate pack)
+             ;; 転入先の市町村の条例・方針。手続きではなく、所在を示す参考情報。
+             :local-references (vec refs)
+             :note "候補の一覧であり、届出の要否や受理を決めるのは当局。"}
+      (contains? #{:tax-return :kakutei-shinkoku} when*)
+      (assoc :regulated-professions (:pack/regulated-professions pack)
+             :electronic-preservation (:pack/electronic-preservation-requirements pack)))))
 
 (defn- foreign-resident-gate
   "外国人住民の届出の候補条件（AWAI-3780）。国籍が日本のみでないことと在留状態の確認が必要。
@@ -208,6 +225,57 @@
       (not rs-present?) (undetermined :residence-status-missing :nationalities nats)
       :else nil)))
 
+(defn- select-tax-procedures
+  "確定申告の事実（プロフィール）から候補手続きを抽出する（AWAI-4076）。
+  計算ロジックや仕訳は扱わず（app-itonami-kaikei の責務）、手続きの候補・期限・提出先・出典・不明点を整える。"
+  [pack facts]
+  (let [{:keys [accounting-type apply-blue? consumption-tax]} facts
+        all-procs (:pack/procedures pack)
+        by-id (into {} (map (juxt :procedure/id identity)) all-procs)
+        blue-req? (or (= :blue accounting-type) (= :aoiro accounting-type))
+        white-req? (or (= :white accounting-type) (= :shiroiro accounting-type))
+        apply-blue-req? (or apply-blue? (= :blue-new accounting-type))
+        procs (cond-> []
+                ;; 新規青色申告承認申請
+                apply-blue-req?
+                (conj (by-id :jp/aoiro-shinkoku-shonin-shinsei))
+
+                ;; 所得税確定申告（青色申告）
+                (or blue-req? apply-blue-req?)
+                (conj (by-id :jp/shotoku-kakutei-shinkoku-aoiro))
+
+                ;; 所得税確定申告（白色申告）
+                white-req?
+                (conj (by-id :jp/shotoku-kakutei-shinkoku-shiroiro))
+
+                ;; 区分未指定の場合は青色・白色の両方を候補とし、不明点に指定なしを追加
+                (and (not blue-req?) (not white-req?) (not apply-blue-req?))
+                (into [(update (by-id :jp/shotoku-kakutei-shinkoku-aoiro) :unknowns conj :jp/accounting-type-unspecified)
+                       (update (by-id :jp/shotoku-kakutei-shinkoku-shiroiro) :unknowns conj :jp/accounting-type-unspecified)])
+
+                ;; 消費税確定申告
+                (:taxable? consumption-tax)
+                (conj
+                  (let [method (:method consumption-tax)
+                        proc (by-id :jp/shohi-kakutei-shinkoku)
+                        refined-proc (cond
+                                       (= :two-tenths-special method)
+                                       (update proc :unknowns conj :jp/two-tenths-special-eligibility-criteria-unconfirmed)
+
+                                       (and (= :simplified method) (not (:selected-in-advance? consumption-tax)))
+                                       (update proc :unknowns conj :jp/simplified-tax-prior-notification-unconfirmed)
+
+                                       (nil? method)
+                                       (update proc :unknowns conj :jp/consumption-tax-calculation-method-unspecified)
+
+                                       :else proc)]
+                    refined-proc))
+
+                ;; 簡易課税制度選択届出
+                (:select-simplified? consumption-tax)
+                (conj (by-id :jp/kani-kazei-sentaku-todoke)))]
+    (vec (remove nil? procs))))
+
 (defn shakai-plan
   "候補手続きを出す。facts の例（住所変更）:
   {:person \"fixture-person-1\" :event :move
@@ -216,14 +284,15 @@
    :moved-on \"2026-11-20\" :address-confirmed? true}
   出生・死亡・外国人住民の住所届（国外からの転入）は :event :birth / :death /
   :foreign-resident-move で出し、:to を届出先の市町村、:born-on / :died-on / :moved-on を起算点とする。
-  外国人住民は :nationalities（複数可）と :residence-status も要る。普通の :move では
-  外国人住民の手続きは候補にしない（第30条の46は国外からの転入の特例のため）。"
+  確定申告（AWAI-4076）は :event :tax-return（または :kakutei-shinkoku）で出し、
+  :tax-year（課税年、例: 2026）、:accounting-type（:blue / :white / :blue-new）、
+  :consumption-tax（{:taxable? true :method :simplified / :standard / :two-tenths-special}）などを渡す。"
   [{:keys [packs today grant facts]}]
-  (let [{:keys [person from to moved-on born-on died-on address-confirmed?]} facts
+  (let [{:keys [person from to moved-on born-on died-on address-confirmed? tax-year country]} facts
         event (or (:event facts) :move)]
     (cond
       (not (grant-allows? grant person :plan today)) (blocked :no-authority)
-      (not (contains? #{:move :birth :death :foreign-resident-move} event))
+      (not (contains? #{:move :birth :death :foreign-resident-move :tax-return :kakutei-shinkoku} event))
       (undetermined :unsupported-event :event event)
       (= event :move)
       (cond
@@ -246,6 +315,20 @@
               (if (empty? procs)
                 (undetermined :no-procedure-in-pack :applies-when when*)
                 (candidates-result pack facts person when* procs))))))
+      (contains? #{:tax-return :kakutei-shinkoku} event)
+      (cond
+        (nil? tax-year) (undetermined :tax-year-missing)
+        (false? address-confirmed?) (undetermined :ambiguous-address)
+        :else
+        (let [place (or to (:place facts) (when country {:country country :subdivision (:subdivision facts)}) {:country :jp})
+              ctx (resolve-jurisdiction packs today place)]
+          (if (stopped? ctx)
+            ctx
+            (let [pack (:pack ctx)
+                  procs (select-tax-procedures pack facts)]
+              (if (empty? procs)
+                (undetermined :no-procedure-in-pack :applies-when event)
+                (candidates-result pack facts person event procs))))))
       :else
       (let [gate (when (= event :foreign-resident-move) (foreign-resident-gate facts))
             problem (cond
@@ -346,7 +429,25 @@
                       "診断書又は検案書の添付を担当者が確認する"
                       "死亡の事実を知った日から7日以内かを担当者が確認し、過ぎていれば扱いを担当者が判断する"]
    :jp/gaikokujin-tennyu-todoke ["届出事項（住民基本台帳法 第30条の46）が揃っているかを担当者が確認する"
-                                 "転入日から14日以内かを担当者が確認する"]})
+                                 "転入日から14日以内かを担当者が確認する"]
+   :jp/shotoku-kakutei-shinkoku-aoiro ["申告書第一表・第二表および青色申告決算書が添付されているか担当者が確認する"
+                                       "法定申告期限（所得税法 第120条、通則法 第10条）内であるかを担当者が確認する"
+                                       "本人による自署・電子署名または税理士の署名押印があるかを担当者が確認する"]
+   :jp/shotoku-kakutei-shinkoku-shiroiro ["申告書第一表・第二表および収支内訳書が添付されているか担当者が確認する"
+                                         "法定申告期限（所得税法 第120条、通則法 第10条）内であるかを担当者が確認する"]
+   :jp/aoiro-shinkoku-shonin-shinsei ["青色申告承認申請書の記載事項および提出期限（所得税法 第144条）を担当者が確認する"]
+   :jp/shohi-kakutei-shinkoku ["消費税確定申告書および付表の添付を担当者が確認する"
+                               "法定申告期限（消費税法 第45条、通則法 第10条）内であるかを担当者が確認する"]
+   :jp/kani-kazei-sentaku-todoke ["簡易課税制度選択届出書の記載および適用課税期間開始前の提出（消費税法 第37条）を担当者が確認する"]})
+
+(defn- agency-matches? [agency-jurisdiction submit-to-dest]
+  (if (map? submit-to-dest)
+    (boolean
+      (or (and (:agency agency-jurisdiction)
+               (= (:agency agency-jurisdiction) (:agency submit-to-dest)))
+          (and (:agency submit-to-dest)
+               (= (:id agency-jurisdiction) (:agency submit-to-dest)))))
+    (= (:subdivision agency-jurisdiction) submit-to-dest)))
 
 (defn matsuri-intake
   "受け渡し票を受付準備まで整え、人の審査者へ引き継ぐ。受理・審査・決定はしない。"
@@ -366,8 +467,7 @@
             mine (filter (fn [pid]
                            (let [proc (some #(when (= pid (:procedure/id %)) %)
                                             (:pack/procedures (:pack ctx)))]
-                             (= (:subdivision here)
-                                (submit-to (:submit-to proc) items))))
+                             (agency-matches? here (submit-to (:submit-to proc) items))))
                          (:procedures items))]
         (cond
           (stopped? ctx) ctx

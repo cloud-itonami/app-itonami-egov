@@ -81,3 +81,98 @@
    :moved-on "2026-11-20"
    :nationalities #{:kr}
    :residence-status :medium-long-term-resident})
+
+;; AWAI-4076: 確定申告の架空データ（実在の人物・事業者・認証情報は一切含まない）
+(def tax-facts-blue
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :accounting-type :blue
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-facts-white
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :accounting-type :white
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-facts-blue-new
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :accounting-type :blue-new
+   :apply-blue? true
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-facts-unspecified
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-facts-consumption-simplified
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :accounting-type :blue
+   :consumption-tax {:taxable? true
+                     :method :simplified
+                     :selected-in-advance? true}
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-facts-consumption-simplified-unselected
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :accounting-type :blue
+   :consumption-tax {:taxable? true
+                     :method :simplified
+                     :selected-in-advance? false}
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-facts-consumption-two-tenths
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :accounting-type :white
+   :consumption-tax {:taxable? true
+                     :method :two-tenths-special}
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-facts-consumption-standard
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :accounting-type :blue
+   :consumption-tax {:taxable? true
+                     :method :standard}
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-facts-consumption-select-simplified
+  {:person person
+   :event :tax-return
+   :tax-year 2026
+   :accounting-type :blue
+   :consumption-tax {:taxable? true
+                     :method :standard
+                     :select-simplified? true}
+   :to {:country :jp :subdivision :jp.fixture/city-b}
+   :address-confirmed? true})
+
+(def tax-office-agency
+  {:id :jp.fixture/tax-office
+   :name "架空税務署（テスト用）"
+   :jurisdiction {:country :jp :subdivision :jp.fixture/city-b :agency :jp/tax-office}
+   :confirmed? true})
+
+(def tax-office-staff
+  {:id "fixture-tax-staff-1" :agency :jp.fixture/tax-office :roles #{:intake}})

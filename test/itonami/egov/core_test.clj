@@ -315,3 +315,168 @@
                                                                      :nationalities #{:kr}
                                                                      :residence-status :medium-long-term-resident))))))
         "第30条の46は国外からの転入の特例なので、国内の :move には適用しない")))
+
+;; ===========================================================================
+;; AWAI-4076 / AWAI-4075: 確定申告制度パック（所得税・消費税・税理士法・電帳法）
+;; ===========================================================================
+
+(deftest jp-kakutei-shinkoku-blue
+  (let [p (plan :facts f/tax-facts-blue)
+        cand (first (:candidates p))]
+    (testing "青色申告の候補・期限・提出先・様式・一次出典"
+      (is (= :candidates (:status p)))
+      (is (= :tax-return (:applies-when p)))
+      (is (= [:jp/shotoku-kakutei-shinkoku-aoiro] (mapv :procedure/id (:candidates p))))
+      (is (= :candidate (:standing cand)))
+      (is (= {:kind :statutory-period
+              :from "2027-02-16"
+              :due "2027-03-15"
+              :holiday-exception :tsusoku-10}
+             (:deadline cand))
+          "法定申告期間: 翌年2月16日〜3月15日（所得税法 第120条、通則法 第10条）")
+      (is (= {:agency :jp/tax-office :name "所轄税務署"} (:submit-to cand)))
+      (is (= ["所得税確定申告書（第一表・第二表）" "青色申告決算書（一般用）"] (:forms cand)))
+      (is (= :withheld-unreviewed-pack (:submission-proposal p))
+          "専門家レビュー未了のため提出は提案しない")
+      (is (= #{:jp/income-deduction-eligibility :jp/e-tax-or-paper-method :jp/tax-accountant-involvement}
+             (set (:unknowns cand))))
+      (let [sources (into {} (map (juxt :id identity) (:sources cand)))]
+        (is (= "fb6e7acb23339be99b6198346e43c38fab24faa34c7d40f42e65b73df1218332"
+               (get-in sources [:jp.law/shotoku-120 :sha256])))
+        (is (= "af4d77b60c4b7eef4887ade597d097fbfeae7b734441fc8dcce09215f5ed4385"
+               (get-in sources [:jp.law/shotoku-143 :sha256])))
+        (is (= "5a54b4cb4496e92b4a5cb1d2c032ea0095992f2e20fa464a7478fd9c6978d99e"
+               (get-in sources [:jp.law/tsusoku-10 :sha256])))
+        (is (= "4539b86b8973efff65b555cafa1b54a01738cc8367f6d6c62caef3331903a06e"
+               (get-in sources [:jp.law/zeirishi-52 :sha256])))
+        (is (= "9e80d1292ea6c467761cf815d6a8fcf88bf3603c6fd05537be206907ca42bd06"
+               (get-in sources [:jp.law/denshichobo-7 :sha256])))
+        (is (= "https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/2020.htm"
+               (get-in sources [:jp.nta/shotoku-2020 :url])))
+        (is (= "https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/2070.htm"
+               (get-in sources [:jp.nta/shotoku-2070 :url]))))
+      (testing "AWAI-4075 法域パックスキーマ要件: 資格独占境界および電子帳簿保存法概要が含まれる"
+        (is (some? (:regulated-professions p)))
+        (is (contains? (get-in p [:regulated-professions :jp.profession/zeirishi :monopoly-scope])
+                       :tax-representation))
+        (is (true? (get-in p [:electronic-preservation :categories :electronic-transactions :mandatory?])))
+        (is (false? (get-in p [:electronic-preservation :categories :electronic-books :mandatory?])))))))
+
+(deftest jp-kakutei-shinkoku-white
+  (let [p (plan :facts f/tax-facts-white)
+        cand (first (:candidates p))]
+    (is (= [:jp/shotoku-kakutei-shinkoku-shiroiro] (mapv :procedure/id (:candidates p))))
+    (is (= ["所得税確定申告書（第一表・第二表）" "収支内訳書（一般用）"] (:forms cand)))
+    (is (= {:kind :statutory-period
+            :from "2027-02-16"
+            :due "2027-03-15"
+            :holiday-exception :tsusoku-10}
+           (:deadline cand)))))
+
+(deftest jp-kakutei-shinkoku-blue-new
+  (let [p (plan :facts f/tax-facts-blue-new)
+        pids (mapv :procedure/id (:candidates p))]
+    (testing "新規青色申告希望の場合は青色申告承認申請手続と申告書の両方が候補"
+      (is (= [:jp/aoiro-shinkoku-shonin-shinsei :jp/shotoku-kakutei-shinkoku-aoiro] pids))
+      (let [shinsei (first (:candidates p))]
+        (is (= ["所得税の青色申告承認申請書"] (:forms shinsei)))
+        (is (= {:kind :statutory-deadline :due "2027-03-15" :holiday-exception :tsusoku-10}
+               (:deadline shinsei)))))))
+
+(deftest jp-kakutei-shinkoku-unspecified
+  (let [p (plan :facts f/tax-facts-unspecified)
+        pids (mapv :procedure/id (:candidates p))]
+    (testing "申告区分未指定の場合は青色と白色の両方を提示し不明点に明示"
+      (is (= [:jp/shotoku-kakutei-shinkoku-aoiro :jp/shotoku-kakutei-shinkoku-shiroiro] pids))
+      (is (every? #(contains? (set (:unknowns %)) :jp/accounting-type-unspecified)
+                  (:candidates p))))))
+
+(deftest jp-kakutei-shinkoku-consumption-simplified
+  (let [p (plan :facts f/tax-facts-consumption-simplified)
+        pids (mapv :procedure/id (:candidates p))
+        shohi (second (:candidates p))]
+    (testing "消費税簡易課税選択の確定申告"
+      (is (= [:jp/shotoku-kakutei-shinkoku-aoiro :jp/shohi-kakutei-shinkoku] pids))
+      (is (= {:kind :statutory-deadline :due "2027-03-31" :holiday-exception :tsusoku-10}
+             (:deadline shohi))
+          "個人事業者の消費税申告期限は翌年3月31日（消費税法 第45条）")
+      (is (not (contains? (set (:unknowns shohi)) :jp/simplified-tax-prior-notification-unconfirmed))
+          "事前届出済みが確認されているため警告不明点は入らない"))
+    (testing "事前届出が未確認の場合は不明点に届出未確認を明示"
+      (let [p-unselected (plan :facts f/tax-facts-consumption-simplified-unselected)
+            shohi-unselected (second (:candidates p-unselected))]
+        (is (contains? (set (:unknowns shohi-unselected))
+                       :jp/simplified-tax-prior-notification-unconfirmed))))))
+
+(deftest jp-kakutei-shinkoku-consumption-two-tenths
+  (let [p (plan :facts f/tax-facts-consumption-two-tenths)
+        shohi (second (:candidates p))]
+    (testing "インボイス2割特例選択時は経過措置要件の確認不明点を明示"
+      (is (= [:jp/shotoku-kakutei-shinkoku-shiroiro :jp/shohi-kakutei-shinkoku]
+             (mapv :procedure/id (:candidates p))))
+      (is (contains? (set (:unknowns shohi))
+                     :jp/two-tenths-special-eligibility-criteria-unconfirmed)))))
+
+(deftest jp-kakutei-shinkoku-consumption-select-simplified
+  (let [p (plan :facts f/tax-facts-consumption-select-simplified)
+        pids (mapv :procedure/id (:candidates p))]
+    (testing "簡易課税制度の選択届出書が候補に追加される"
+      (is (= [:jp/shotoku-kakutei-shinkoku-aoiro :jp/shohi-kakutei-shinkoku :jp/kani-kazei-sentaku-todoke]
+             pids))
+      (let [sentaku (nth (:candidates p) 2)]
+        (is (= ["消費税簡易課税制度選択届出書"] (:forms sentaku)))
+        (is (= {:kind :statutory-deadline :due "2027-12-31" :holiday-exception :tsusoku-10}
+               (:deadline sentaku)))))))
+
+(deftest matsuri-tax-intake
+  (let [p (plan :facts f/tax-facts-blue)
+        packet (c/share-packet {:plan p :facts f/tax-facts-blue :consent (assoc f/consent :recipient :jp.fixture/tax-office)
+                                :today f/today})
+        intake (c/matsuri-intake {:packet packet :agency f/tax-office-agency :staff f/tax-office-staff
+                                  :packs f/packs :today f/today})]
+    (testing "Matsuri 税務署受付準備: 人間への引継ぎと確認項目"
+      (is (= :ready-for-human-review (:status intake)))
+      (is (nil? (:decision intake)) "税務判断・決定は人間が行う（代理決定なし）")
+      (is (= {:to :human-reviewer :role :case-reviewer} (:handoff intake)))
+      (is (= [:jp/shotoku-kakutei-shinkoku-aoiro] (:procedures intake)))
+      (is (seq (:checklist intake)))
+      (is (some #(clojure.string/includes? % "青色申告決算書") (:checklist intake))))))
+
+;; ===========================================================================
+;; 負の対照テスト（Negative control tests）: 安全境界・非送信・非代理原則
+;; ===========================================================================
+
+(deftest tax-negative-controls
+  (testing "前提事実の不足・未確定時の停止"
+    (is (= :tax-year-missing (:reason (plan :facts (dissoc f/tax-facts-blue :tax-year))))
+        "課税年がなければ未確定")
+    (is (= :ambiguous-address (:reason (plan :facts (assoc f/tax-facts-blue :address-confirmed? false))))
+        "住所未確定なら未確定")
+    (is (= :no-authority (:reason (plan :facts f/tax-facts-blue :grant nil)))
+        "権限付与がなければ遮断"))
+  (testing "制度パックの鮮度期限切れ（stale）時の遮断"
+    (is (= :pack-not-current (:reason (plan :facts f/tax-facts-blue :today "2027-03-01"))))
+    (is (= :stale (:freshness (plan :facts f/tax-facts-blue :today "2027-03-01")))))
+  (testing "ガバナンス: 未レビューパックにおける提出提案の保留（非送信原則）"
+    (let [p (plan :facts f/tax-facts-blue)]
+      (is (= :withheld-unreviewed-pack (:submission-proposal p)))
+      (is (not= :allowed-after-user-check (:submission-proposal p)))))
+  (testing "税理士法第52条境界: 税務相談・代理判断アクションの拒絶"
+    (is (not (c/grant-allows? {:actor :delegate :principal f/person :scope #{:plan} :expires "2026-12-31"}
+                              f/person :tax-consultation f/today))
+        "税務相談アクションは許可されない")
+    (is (not (c/grant-allows? {:actor :delegate :principal f/person :scope #{:plan} :expires "2026-12-31"}
+                              f/person :tax-proxy f/today))
+        "税理士法上の税務代理・申告代行アクションは許可されない")
+    (is (not (c/grant-allows? {:actor :delegate :principal f/person :scope #{:plan} :expires "2026-12-31"}
+                              f/person :e-tax-auto-submit f/today))
+        "e-Tax自動送信アクションは許可されない（本人手動提出のみ）"))
+  (testing "管轄機関不一致: 市役所窓口は国税（確定申告）の受付準備を拒絶する"
+    (let [p (plan :facts f/tax-facts-blue)
+          packet (c/share-packet {:plan p :facts f/tax-facts-blue :consent (assoc f/consent :recipient :jp.fixture/city-b-office)
+                                  :today f/today})
+          r (c/matsuri-intake {:packet packet :agency f/agency :staff f/staff
+                               :packs f/packs :today f/today})]
+      (is (= :not-this-agency (:reason r))
+          "市役所市民課は税務署の手続きを扱わない"))))
+
