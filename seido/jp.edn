@@ -1,10 +1,11 @@
 ;; 制度パック: 日本（国の法令レベル）
-;; 出典は e-Gov 法令 API v2 で 2026-11-18 と 2026-11-23 に取得し、応答 JSON の sha256 を記録した
-;; （AWAI-3780 で戸籍法 第49条・第86条と住民基本台帳法 第30条の46を追加）。
+;; 出典は e-Gov 法令 API v2 で 2026-11-18, 2026-11-23, 2026-11-26 に取得し、応答 JSON の sha256 を記録した
+;; （AWAI-3780 で戸籍法 第49条・第86条と住民基本台帳法 第30条の46を追加、
+;;   AWAI-4076/AWAI-4075 で所得税法、消費税法、国税通則法、税理士法、電子帳簿保存法、および国税庁公式案内を追加）。
 ;; 専門家レビューは未実施。:review/status :unreviewed の間は「候補」の提示だけを許し、
 ;; 提出の提案はしない（AWAI-155）。
 {:pack/id :jp/residence-and-corporate-address
- :pack/version "2026.11.23-1"
+ :pack/version "2026.11.26-1"
  :pack/jurisdiction [:jp]
  :pack/language :ja
  ;; 国の法令だけで候補を出せるが、窓口・様式は市町村ごとに違うので、
@@ -18,6 +19,31 @@
  :review/status :unreviewed
  :review/reviewer nil
  :review/reviewed-on nil
+
+ ;; AWAI-4075: 資格制度・独占業務の範囲
+ :pack/regulated-professions
+ {:jp.profession/zeirishi
+  {:statute :jp.law/zeirishi-52
+   :title "税理士業務の制限（税理士法 第52条）"
+   :monopoly-scope #{:tax-representation :tax-document-preparation :tax-consultation}
+   :policy "税務代理・税務書類作成・個別税務相談は行わない。本人が自ら行う申告手続の候補・期限・提出先の案内に限る。"}}
+
+ ;; AWAI-4075: 電子帳簿保存法の保存要件の概要
+ :pack/electronic-preservation-requirements
+ {:statute-books-and-scanners :jp.law/denshichobo-4
+  :statute-electronic-transactions :jp.law/denshichobo-7
+  :overview "電子計算機を使用して作成する国税関係帳簿書類の保存方法等の特例に関する法律（電子帳簿保存法）に基づく概要"
+  :categories
+  {:electronic-transactions
+   {:mandatory? true
+    :summary "電子取引（メール・クラウド等で授受したPDFの請求書・領収書等）は電子データのまま保存することが義務。紙保存への出力代替不可。真実性・可視性の確保が必要。"}
+   :electronic-books
+   {:mandatory? false
+    :summary "最初からPC等で作成した国税関係帳簿書類のデータ保存は任意。優良電子帳簿は過少申告加算税の軽減等の特典あり。"}
+   :scanner-storage
+   {:mandatory? false
+    :summary "紙で受領または作成した書類をスキャナ等で読み取って保存する制度（任意）。"}}}
+
  :pack/sources
  {:jp.law/jumin-22
   {:title "住民基本台帳法 第22条（転入届）"
@@ -81,7 +107,153 @@
    :law-revision-id "342AC0000000081_20261024_508AC0000000066"
    :in-force-from "2026-10-24"
    :retrieved-on "2026-11-23"
-   :sha256 "360bbb25492b5af0a2ef64775bdc22b7ee33bcff6b84e408be06d973df5966f4"}}
+   :sha256 "360bbb25492b5af0a2ef64775bdc22b7ee33bcff6b84e408be06d973df5966f4"}
+
+  ;; 所得税法
+  :jp.law/shotoku-120
+  {:title "所得税法 第120条（確定所得申告）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/340AC0000000033"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/340AC0000000033?law_full_text_format=json&elm=MainProvision-Article_120"
+   :law-revision-id "340AC0000000033_20261001_507AC0000000070"
+   :in-force-from "2026-10-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "fb6e7acb23339be99b6198346e43c38fab24faa34c7d40f42e65b73df1218332"}
+  :jp.law/shotoku-143
+  {:title "所得税法 第143条（青色申告）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/340AC0000000033"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/340AC0000000033?law_full_text_format=json&elm=MainProvision-Article_143"
+   :law-revision-id "340AC0000000033_20261001_507AC0000000070"
+   :in-force-from "2026-10-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "af4d77b60c4b7eef4887ade597d097fbfeae7b734441fc8dcce09215f5ed4385"}
+  :jp.law/shotoku-144
+  {:title "所得税法 第144条（青色申告の承認の申請）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/340AC0000000033"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/340AC0000000033?law_full_text_format=json&elm=MainProvision-Article_144"
+   :law-revision-id "340AC0000000033_20261001_507AC0000000070"
+   :in-force-from "2026-10-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "c367f3ca523c4006a4151b544578b10644a91e68733c87ede1c30428b1fe6a4d"}
+
+  ;; 国税通則法
+  :jp.law/tsusoku-10
+  {:title "国税通則法 第10条（期間の計算及び期限の特例）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/337AC0000000066"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/337AC0000000066?law_full_text_format=json&elm=MainProvision-Article_10"
+   :law-revision-id "337AC0000000066_20261101_507AC0000000013"
+   :in-force-from "2026-11-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "5a54b4cb4496e92b4a5cb1d2c032ea0095992f2e20fa464a7478fd9c6978d99e"}
+  :jp.law/tsusoku-18
+  {:title "国税通則法 第18条（期限後申告）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/337AC0000000066"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/337AC0000000066?law_full_text_format=json&elm=MainProvision-Article_18"
+   :law-revision-id "337AC0000000066_20261101_507AC0000000013"
+   :in-force-from "2026-11-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "9d90ce3f2b37fe45d2fd64bed0db1025a1d1e3f794108457e1184ecee854579b"}
+  :jp.law/tsusoku-19
+  {:title "国税通則法 第19条（修正申告）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/337AC0000000066"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/337AC0000000066?law_full_text_format=json&elm=MainProvision-Article_19"
+   :law-revision-id "337AC0000000066_20261101_507AC0000000013"
+   :in-force-from "2026-11-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "211522492b86d5da1586dacf825de6660b8d5c2f197713ad0c2d2c21db694d4c"}
+
+  ;; 消費税法
+  :jp.law/shohi-45
+  {:title "消費税法 第45条（確定申告）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/363AC0000000108"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/363AC0000000108?law_full_text_format=json&elm=MainProvision-Article_45"
+   :law-revision-id "363AC0000000108_20261101_507AC0000000013"
+   :in-force-from "2026-11-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "be538bd3d7b412b6c23046a374bed7ef4e3ba593cb8122c54deb2ddbc578c92e"}
+  :jp.law/shohi-37
+  {:title "消費税法 第37条（中小事業者の仕入れに係る消費税額の控除の特例）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/363AC0000000108"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/363AC0000000108?law_full_text_format=json&elm=MainProvision-Article_37"
+   :law-revision-id "363AC0000000108_20261101_507AC0000000013"
+   :in-force-from "2026-11-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "737af1455c25634b365af587edba1f9a6c261df942702c8a2db812d4f006cc87"}
+
+  ;; 税理士法
+  :jp.law/zeirishi-52
+  {:title "税理士法 第52条（税理士業務の制限）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/326AC1000000237"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/326AC1000000237?law_full_text_format=json&elm=MainProvision-Article_52"
+   :law-revision-id "326AC1000000237_20251001_505AC0000000053"
+   :in-force-from "2025-10-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "4539b86b8973efff65b555cafa1b54a01738cc8367f6d6c62caef3331903a06e"}
+
+  ;; 電子帳簿保存法
+  :jp.law/denshichobo-4
+  {:title "電子計算機を使用して作成する国税関係帳簿書類の保存方法等の特例に関する法律 第4条（国税関係帳簿書類の電磁的記録による保存等）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/410AC0000000025"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/410AC0000000025?law_full_text_format=json&elm=MainProvision-Article_4"
+   :law-revision-id "410AC0000000025_20250401_507AC0000000013"
+   :in-force-from "2025-04-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "96b1c05f68565478099ac6c1ca3dc5b4ae8e5d349b4abe078120342716cad94c"}
+  :jp.law/denshichobo-7
+  {:title "電子計算機を使用して作成する国税関係帳簿書類の保存方法等の特例に関する法律 第7条（電子取引の取引情報に係る電磁的記録の保存）"
+   :issuer "e-Gov 法令検索（デジタル庁）"
+   :url "https://laws.e-gov.go.jp/law/410AC0000000025"
+   :api "https://laws.e-gov.go.jp/api/2/law_data/410AC0000000025?law_full_text_format=json&elm=MainProvision-Article_7"
+   :law-revision-id "410AC0000000025_20250401_507AC0000000013"
+   :in-force-from "2025-04-01"
+   :retrieved-on "2026-11-26"
+   :sha256 "9e80d1292ea6c467761cf815d6a8fcf88bf3603c6fd05537be206907ca42bd06"}
+
+  ;; 国税庁（NTA）一次情報
+  :jp.nta/shotoku-2020
+  {:title "No.2020 確定申告｜国税庁"
+   :issuer "国税庁（National Tax Agency Japan）"
+   :url "https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/2020.htm"
+   :confirmed-on "2026-11-26"}
+  :jp.nta/shotoku-2070
+  {:title "No.2070 青色申告制度｜国税庁"
+   :issuer "国税庁（National Tax Agency Japan）"
+   :url "https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/2070.htm"
+   :confirmed-on "2026-11-26"}
+  :jp.nta/shohi-6505
+  {:title "No.6505 簡易課税制度｜国税庁"
+   :issuer "国税庁（National Tax Agency Japan）"
+   :url "https://www.nta.go.jp/taxes/shiraberu/taxanswer/shohi/6505.htm"
+   :confirmed-on "2026-11-26"}
+  :jp.nta/invoice-2tokurei
+  {:title "２割特例 特設ページ｜国税庁"
+   :issuer "国税庁（National Tax Agency Japan）"
+   :url "https://www.nta.go.jp/taxes/shiraberu/zeimokubetsu/shohi/keigenzeiritsu/invoice_2tokurei.htm"
+   :confirmed-on "2026-11-26"}
+  :jp.nta/e-tax
+  {:title "【e-Tax】国税電子申告・納税システム(イータックス)"
+   :issuer "国税庁（National Tax Agency Japan）"
+   :url "https://www.e-tax.nta.go.jp/"
+   :confirmed-on "2026-11-26"}
+  :jp.nta/denshichobo-tokusetsu
+  {:title "電子帳簿等保存制度特設サイト｜国税庁"
+   :issuer "国税庁（National Tax Agency Japan）"
+   :url "https://www.nta.go.jp/law/joho-zeikaishaku/sonota/jirei/tokusetsu/index.htm"
+   :confirmed-on "2026-11-26"}
+  :jp.nta/denshichobo-gaiyo
+  {:title "電子帳簿保存法の概要｜国税庁"
+   :issuer "国税庁（National Tax Agency Japan）"
+   :url "https://www.nta.go.jp/law/joho-zeikaishaku/sonota/jirei/02.htm"
+   :confirmed-on "2026-11-26"}}
  :pack/procedures
  [{:procedure/id :jp/tenshutsu-todoke
    :procedure/title "転出届"
@@ -140,4 +312,66 @@
    :deadline {:kind :within-days :days 14 :anchor :moved-on}
    :submit-to :to-municipality
    :unknowns [:jp/foreign-resident-category-table-not-encoded]
-   :sources [:jp.law/jumin-30-46]}]}
+   :sources [:jp.law/jumin-30-46]}
+
+  ;; AWAI-4076: 所得税確定申告（青色申告）
+  {:procedure/id :jp/shotoku-kakutei-shinkoku-aoiro
+   :procedure/title "所得税確定申告（青色申告）"
+   :subject :person
+   :applies-when #{:tax-return :aoiro-tax-return}
+   :tax/category :income-tax
+   :tax/accounting-type :blue
+   :forms ["所得税確定申告書（第一表・第二表）" "青色申告決算書（一般用）"]
+   :deadline {:kind :statutory-period :anchor :tax-year :start-month-day "02-16" :due-month-day "03-15"}
+   :submit-to {:agency :jp/tax-office :name "所轄税務署"}
+   :unknowns [:jp/income-deduction-eligibility :jp/e-tax-or-paper-method :jp/tax-accountant-involvement]
+   :sources [:jp.law/shotoku-120 :jp.law/shotoku-143 :jp.law/tsusoku-10 :jp.nta/shotoku-2020 :jp.nta/shotoku-2070 :jp.law/zeirishi-52 :jp.law/denshichobo-7]}
+
+  ;; AWAI-4076: 所得税確定申告（白色申告）
+  {:procedure/id :jp/shotoku-kakutei-shinkoku-shiroiro
+   :procedure/title "所得税確定申告（白色申告）"
+   :subject :person
+   :applies-when #{:tax-return :shiroiro-tax-return}
+   :tax/category :income-tax
+   :tax/accounting-type :white
+   :forms ["所得税確定申告書（第一表・第二表）" "収支内訳書（一般用）"]
+   :deadline {:kind :statutory-period :anchor :tax-year :start-month-day "02-16" :due-month-day "03-15"}
+   :submit-to {:agency :jp/tax-office :name "所轄税務署"}
+   :unknowns [:jp/income-deduction-eligibility :jp/e-tax-or-paper-method :jp/tax-accountant-involvement]
+   :sources [:jp.law/shotoku-120 :jp.law/tsusoku-10 :jp.nta/shotoku-2020 :jp.law/zeirishi-52 :jp.law/denshichobo-7]}
+
+  ;; AWAI-4076: 所得税青色申告承認申請手続
+  {:procedure/id :jp/aoiro-shinkoku-shonin-shinsei
+   :procedure/title "所得税の青色申告承認申請手続"
+   :subject :person
+   :applies-when #{:tax-return :aoiro-application}
+   :tax/category :income-tax-approval
+   :forms ["所得税の青色申告承認申請書"]
+   :deadline {:kind :statutory-deadline :anchor :tax-year :due-month-day "03-15"}
+   :submit-to {:agency :jp/tax-office :name "所轄税務署"}
+   :unknowns [:jp/business-commencement-date-if-midyear]
+   :sources [:jp.law/shotoku-144 :jp.nta/shotoku-2070 :jp.law/zeirishi-52]}
+
+  ;; AWAI-4076: 消費税確定申告（個人事業者）
+  {:procedure/id :jp/shohi-kakutei-shinkoku
+   :procedure/title "消費税確定申告（個人事業者）"
+   :subject :person
+   :applies-when #{:tax-return :consumption-tax-return}
+   :tax/category :consumption-tax
+   :forms ["消費税及び地方消費税確定申告書" "付表"]
+   :deadline {:kind :statutory-deadline :anchor :tax-year :due-month-day "03-31"}
+   :submit-to {:agency :jp/tax-office :name "所轄税務署"}
+   :unknowns [:jp/consumption-tax-calculation-method :jp/invoice-registration-status]
+   :sources [:jp.law/shohi-45 :jp.law/tsusoku-10 :jp.law/shohi-37 :jp.nta/shohi-6505 :jp.nta/invoice-2tokurei :jp.law/zeirishi-52 :jp.law/denshichobo-7]}
+
+  ;; AWAI-4076: 消費税簡易課税制度選択届出手続
+  {:procedure/id :jp/kani-kazei-sentaku-todoke
+   :procedure/title "消費税簡易課税制度選択届出手続"
+   :subject :person
+   :applies-when #{:tax-return :simplified-tax-selection}
+   :tax/category :consumption-tax-selection
+   :forms ["消費税簡易課税制度選択届出書"]
+   :deadline {:kind :statutory-deadline :anchor :tax-year :due-month-day "12-31"}
+   :submit-to {:agency :jp/tax-office :name "所轄税務署"}
+   :unknowns [:jp/base-period-sales-under-50m-yen-not-verified]
+   :sources [:jp.law/shohi-37 :jp.nta/shohi-6505 :jp.law/zeirishi-52]}]}
